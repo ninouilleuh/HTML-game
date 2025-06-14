@@ -1,0 +1,20 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+}
+body {
+    width: 100vw;
+    height: 100vh;
+    background: #222;
+}
+canvas, #mapCanvas {
+    display: block;
+    margin: auto;
+    background: #111;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
