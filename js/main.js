@@ -63,6 +63,7 @@ function dayNightLoop() {
     }
     if (timeOfDay > 1) timeOfDay -= 1;
     updateEnemies();
+    updateForestFires();
     drawMap();
     requestAnimationFrame(dayNightLoop);
 }
