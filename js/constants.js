@@ -1,8 +1,8 @@
 // Detect if on mobile device
-const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+window.isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-// Set pixelSize based on device type
-const pixelSize = isMobile ? 32 : 14; // More zoomed in on mobile, default on desktop
+// Increase pixelSize for even more zoom on mobile
+window.pixelSize = window.isMobile ? 28 : 14; // 48 for mobile, 14 for desktop
 
 const tileColors = {
     grass: "#4caf50",
