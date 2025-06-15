@@ -151,20 +151,6 @@ function countAdjacentForest(x, y) {
     return count;
 }
 
-// Patch getTileType to return burnt, fresh, or forced grass
-const _originalGetTileType = getTileType;
-function getTileTypePatched(x, y) {
-    const key = `${x},${y}`;
-    if (burntTiles.has(key)) {
-        const info = burntTiles.get(key);
-        if (info.stage === "burnt" && info.timeLeft > 0) return "burnt";
-        if (info.stage === "fresh" && info.timeLeft > 0) return "fresh";
-    }
-    if (forcedGrassTiles.has(key)) return "grass";
-    return _originalGetTileType(x, y);
-}
-window.getTileType = getTileTypePatched;
-
 // Place campfire on click if player has one in inventory
 function handleCampfireClick(e) {
     if (typeof message !== "undefined" && message) {

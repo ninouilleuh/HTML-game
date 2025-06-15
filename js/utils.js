@@ -129,8 +129,7 @@ function isNearWater(x, y, radius = 4) {
 
 // Update dry grass tiles (call this in your main game loop)
 function updateDryGrass() {
-    // Use the same area as drawMap for consistency
-    const extraTiles = 10; // match drawMap's extraTiles
+    const extraTiles = 3;
     const tilesX = Math.ceil(canvas.width / pixelSize) + 2 + extraTiles * 2;
     const tilesY = Math.ceil(canvas.height / pixelSize) + 2 + extraTiles * 2;
     const startX = player.x - Math.floor(tilesX / 2);
@@ -141,26 +140,24 @@ function updateDryGrass() {
             const x = wrapX(startX + dx);
             const y = wrapY(startY + dy);
             const key = `${x},${y}`;
+            // Use the original tile type for logic
             if (
-                getTileType(x, y) === "grass" &&
-                !isNearWater(x, y, 4) &&
-                getTemperature(x, y) >= 25
+                _originalGetTileType(x, y) === "grass" &&
+                getHumidity(x, y) <= 30
             ) {
                 dryGrassTiles.add(key);
             }
-            // No more spontaneous burning of dry grass
+            // Remove dry grass if humidity rises above 30 or tile is no longer grass
+            if (
+                dryGrassTiles.has(key) &&
+                (_originalGetTileType(x, y) !== "grass" || getHumidity(x, y) > 30)
+            ) {
+                dryGrassTiles.delete(key);
+            }
         }
     }
 }
 
-// Patch getTileType to return "dry" for dry grass tiles
-const _originalGetTileTypeDry = window.getTileType || getTileType;
-function getTileTypeWithDry(x, y) {
-    const key = `${x},${y}`;
-    if (dryGrassTiles.has(key)) return "dry";
-    return _originalGetTileTypeDry(x, y);
-}
-window.getTileType = getTileTypeWithDry;
 
 // Helper to check if a tile is adjacent to a given type
 function isNearType(x, y, type) {
@@ -343,3 +340,22 @@ const WORLD_Y_SIZE = WORLD_Y_MAX - WORLD_Y_MIN + 1;
 const WORLD_X_MIN = -5000;
 const WORLD_X_MAX = 5000;
 const WORLD_X_SIZE = WORLD_X_MAX - WORLD_X_MIN + 1;
+const DRY_GRASS_HUMIDITY_THRESHOLD = 30;
+
+// Patch getTileType to handle burnt, fresh, forced grass, and dry grass
+const _originalGetTileType = getTileType;
+function getTileTypePatched(x, y) {
+    const key = `${x},${y}`;
+    // Burnt/fresh/forced grass logic (from campfire.js)
+    if (typeof burntTiles !== "undefined" && burntTiles.has(key)) {
+        const info = burntTiles.get(key);
+        if (info.stage === "burnt" && info.timeLeft > 0) return "burnt";
+        if (info.stage === "fresh" && info.timeLeft > 0) return "fresh";
+    }
+    if (typeof forcedGrassTiles !== "undefined" && forcedGrassTiles.has(key)) return "grass";
+    // Only check dry grass if base type is grass
+    const baseType = _originalGetTileType(x, y);
+    if (baseType === "grass" && typeof dryGrassTiles !== "undefined" && dryGrassTiles.has(key)) return "dry";
+    return baseType;
+}
+window.getTileType = getTileTypePatched;

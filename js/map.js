@@ -2,7 +2,7 @@ function drawMap() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Increase render distance: add more tiles to each side
-    const extraTiles = 10; // Increase this for even more distance
+    const extraTiles = 3; // Increase this for even more distance
     const tilesX = Math.ceil(canvas.width / pixelSize) + 2 + extraTiles * 2;
     const tilesY = Math.ceil(canvas.height / pixelSize) + 2 + extraTiles * 2;
 
