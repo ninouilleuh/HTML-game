@@ -277,10 +277,10 @@ function createMobileJoystick() {
     const joystick = document.createElement('div');
     joystick.id = 'mobile-joystick';
     joystick.style.position = 'fixed';
-    joystick.style.left = '30px';
-    joystick.style.bottom = '30px';
-    joystick.style.width = '120px';
-    joystick.style.height = '120px';
+    joystick.style.left = '24px';
+    joystick.style.bottom = '24px';
+    joystick.style.width = '180px';      // Larger size
+    joystick.style.height = '180px';     // Larger size
     joystick.style.background = 'rgba(0,0,0,0.2)';
     joystick.style.borderRadius = '50%';
     joystick.style.zIndex = 1000;
@@ -290,22 +290,22 @@ function createMobileJoystick() {
     // Inner stick
     const stick = document.createElement('div');
     stick.style.position = 'absolute';
-    stick.style.left = '40px';
-    stick.style.top = '40px';
-    stick.style.width = '40px';
-    stick.style.height = '40px';
+    stick.style.left = '60px';           // Centered for new size
+    stick.style.top = '60px';
+    stick.style.width = '60px';          // Larger stick
+    stick.style.height = '60px';
     stick.style.background = '#FFD700';
-    stick.style.opacity = '0.8';
+    stick.style.opacity = '0.85';
     stick.style.borderRadius = '50%';
     stick.style.transition = 'left 0.05s, top 0.05s';
     joystick.appendChild(stick);
 
-    let centerX = 60, centerY = 60;
+    let centerX = 90, centerY = 90;      // Center for new size
     let active = false;
     let moveTimer = null;
 
     function getDirection(dx, dy) {
-        let threshold = 18;
+        let threshold = 28; // Larger threshold for bigger joystick
         let dirX = 0, dirY = 0;
         if (dx < -threshold) dirX = -1;
         if (dx > threshold) dirX = 1;
@@ -342,8 +342,8 @@ function createMobileJoystick() {
         const y = touch.clientY - rect.top;
         let dx = x - centerX;
         let dy = y - centerY;
-        stick.style.left = (centerX + dx * 0.5 - 20) + 'px';
-        stick.style.top = (centerY + dy * 0.5 - 20) + 'px';
+        stick.style.left = (centerX + dx * 0.5 - 30) + 'px';
+        stick.style.top = (centerY + dy * 0.5 - 30) + 'px';
         startMoveLoop(dx, dy);
     });
 
@@ -356,26 +356,26 @@ function createMobileJoystick() {
         let dx = x - centerX;
         let dy = y - centerY;
         let dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 40) {
-            dx = dx * 40 / dist;
-            dy = dy * 40 / dist;
+        if (dist > 60) { // Clamp for new size
+            dx = dx * 60 / dist;
+            dy = dy * 60 / dist;
         }
-        stick.style.left = (centerX + dx - 20) + 'px';
-        stick.style.top = (centerY + dy - 20) + 'px';
+        stick.style.left = (centerX + dx - 30) + 'px';
+        stick.style.top = (centerY + dy - 30) + 'px';
         startMoveLoop(dx, dy);
     });
 
     joystick.addEventListener('touchend', function(e) {
         active = false;
-        stick.style.left = '40px';
-        stick.style.top = '40px';
+        stick.style.left = '60px';
+        stick.style.top = '60px';
         stopMoveLoop();
     });
 
     joystick.addEventListener('touchcancel', function(e) {
         active = false;
-        stick.style.left = '40px';
-        stick.style.top = '40px';
+        stick.style.left = '60px';
+        stick.style.top = '60px';
         stopMoveLoop();
     });
 
