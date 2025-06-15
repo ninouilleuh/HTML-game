@@ -390,4 +390,256 @@ if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     window.addEventListener('DOMContentLoaded', createMobileJoystick);
 }
 
+function createInventoryButton() {
+    if (document.getElementById('inventory-btn')) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'inventory-btn';
+    btn.textContent = 'Inventory';
+    btn.style.position = 'fixed';
+    btn.style.right = '24px';
+    btn.style.bottom = '24px';
+    btn.style.width = '120px';
+    btn.style.height = '56px';
+    btn.style.fontSize = '22px';
+    btn.style.background = '#222';
+    btn.style.color = '#FFD700';
+    btn.style.border = '2px solid #FFD700';
+    btn.style.borderRadius = '14px';
+    btn.style.zIndex = 9999;
+    btn.style.opacity = '0.95';
+
+    btn.onclick = function() {
+        showInventoryBox();
+    };
+
+    document.body.appendChild(btn);
+}
+
+// Inventory box UI
+function showInventoryBox() {
+    // Remove existing box if any
+    let oldBox = document.getElementById('inventory-box');
+    if (oldBox) oldBox.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'inventory-box';
+    overlay.style.position = 'fixed';
+    overlay.style.left = '0';
+    overlay.style.top = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.background = 'rgba(0,0,0,0.45)';
+    overlay.style.zIndex = '10000';
+    overlay.onclick = function(e) {
+        if (e.target === overlay) overlay.remove();
+    };
+
+    // Inventory panel
+    const panel = document.createElement('div');
+    panel.style.position = 'absolute';
+    panel.style.left = '50%';
+    panel.style.top = '50%';
+    panel.style.transform = 'translate(-50%, -50%)';
+    panel.style.background = '#222';
+    panel.style.border = '3px solid #FFD700';
+    panel.style.borderRadius = '18px';
+    panel.style.padding = '24px 32px';
+    panel.style.minWidth = '320px';
+    panel.style.minHeight = '180px';
+    panel.style.boxShadow = '0 8px 32px #000a';
+    panel.style.display = 'flex';
+    panel.style.flexDirection = 'column';
+    panel.style.alignItems = 'center';
+
+    // Title
+    const title = document.createElement('div');
+    title.textContent = 'Inventory';
+    title.style.color = '#FFD700';
+    title.style.fontSize = '28px';
+    title.style.marginBottom = '18px';
+    panel.appendChild(title);
+
+    // Inventory slots
+    const slots = document.createElement('div');
+    slots.style.display = 'flex';
+    slots.style.flexWrap = 'wrap';
+    slots.style.gap = '16px';
+    slots.style.justifyContent = 'center';
+    slots.style.marginBottom = '12px';
+
+    // Group items and count
+    const items = (player && player.inventory) ? player.inventory.slice() : [];
+    const itemCounts = {};
+    for (const item of items) {
+        itemCounts[item] = (itemCounts[item] || 0) + 1;
+    }
+    const uniqueItems = Object.keys(itemCounts);
+    const slotSize = 56;
+    const maxSlots = Math.max(8, uniqueItems.length);
+
+    // Simple emoji or text for each item type
+    const itemIcons = {
+        "campfire": "🔥",
+        "bonfire": "🔥",
+        "stone": "🪨",
+        "food": "🍖",
+        "water": "💧",
+        // Add more as needed
+    };
+
+    for (let i = 0; i < maxSlots; i++) {
+        const slot = document.createElement('div');
+        slot.style.width = slotSize + 'px';
+        slot.style.height = slotSize + 'px';
+        slot.style.background = '#333';
+        slot.style.border = '2px solid #FFD700';
+        slot.style.borderRadius = '10px';
+        slot.style.display = 'flex';
+        slot.style.alignItems = 'center';
+        slot.style.justifyContent = 'center';
+        slot.style.fontSize = '28px';
+        slot.style.color = '#FFD700';
+        slot.style.boxSizing = 'border-box';
+        slot.style.position = 'relative';
+
+        if (uniqueItems[i]) {
+            if (uniqueItems[i] === "stick") {
+                // Draw a pixel stick using canvas that fits the slot exactly
+                const canvas = document.createElement('canvas');
+                canvas.width = slotSize;
+                canvas.height = slotSize;
+                canvas.style.width = slotSize + "px";
+                canvas.style.height = slotSize + "px";
+                canvas.style.display = "block";
+                canvas.style.background = "transparent";
+                canvas.style.margin = "0";
+                canvas.style.padding = "0";
+                canvas.style.boxSizing = "border-box";
+                // Draw a brown diagonal stick, thick and spanning the slot
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, slotSize, slotSize);
+                ctx.strokeStyle = "#8B5A2B";
+                ctx.lineWidth = Math.max(6, slotSize / 8);
+                ctx.lineCap = "round";
+                ctx.beginPath();
+                ctx.moveTo(slotSize * 0.20, slotSize * 0.80);
+                ctx.lineTo(slotSize * 0.80, slotSize * 0.20);
+                ctx.stroke();
+                slot.innerHTML = ""; // Remove any text
+                slot.appendChild(canvas);
+            } else if (uniqueItems[i] === "big stick") {
+                // Draw a big stick using canvas that fits the slot exactly
+                const canvas = document.createElement('canvas');
+                canvas.width = slotSize;
+                canvas.height = slotSize;
+                canvas.style.width = slotSize + "px";
+                canvas.style.height = slotSize + "px";
+                canvas.style.display = "block";
+                canvas.style.background = "transparent";
+                canvas.style.margin = "0";
+                canvas.style.padding = "0";
+                canvas.style.boxSizing = "border-box";
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, slotSize, slotSize);
+                // Draw a thicker, darker brown diagonal for "big stick"
+                ctx.strokeStyle = "#5C3317";
+                ctx.lineWidth = Math.max(12, slotSize / 4);
+                ctx.lineCap = "round";
+                ctx.beginPath();
+                ctx.moveTo(slotSize * 0.15, slotSize * 0.85);
+                ctx.lineTo(slotSize * 0.85, slotSize * 0.15);
+                ctx.stroke();
+                slot.innerHTML = "";
+                slot.appendChild(canvas);
+            } else if (uniqueItems[i] === "campfire") {
+                // Draw an unlit campfire (three crossed logs, no flame)
+                const canvas = document.createElement('canvas');
+                canvas.width = slotSize;
+                canvas.height = slotSize;
+                canvas.style.width = slotSize + "px";
+                canvas.style.height = slotSize + "px";
+                canvas.style.display = "block";
+                canvas.style.background = "transparent";
+                canvas.style.margin = "0";
+                canvas.style.padding = "0";
+                canvas.style.boxSizing = "border-box";
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, slotSize, slotSize);
+
+                ctx.strokeStyle = "#8B5A2B";
+                ctx.lineWidth = Math.max(6, slotSize / 8);
+                ctx.lineCap = "round";
+
+                // First log
+                ctx.beginPath();
+                ctx.moveTo(slotSize * 0.25, slotSize * 0.75);
+                ctx.lineTo(slotSize * 0.75, slotSize * 0.65);
+                ctx.stroke();
+
+                // Second log
+                ctx.beginPath();
+                ctx.moveTo(slotSize * 0.35, slotSize * 0.85);
+                ctx.lineTo(slotSize * 0.65, slotSize * 0.60);
+                ctx.stroke();
+
+                // Third log (crossing the other two)
+                ctx.beginPath();
+                ctx.moveTo(slotSize * 0.50, slotSize * 0.88);
+                ctx.lineTo(slotSize * 0.50, slotSize * 0.58);
+                ctx.stroke();
+
+                slot.innerHTML = "";
+                slot.appendChild(canvas);
+            } else {
+                // Show icon if available, else fallback to name
+                const icon = itemIcons[uniqueItems[i]] || uniqueItems[i][0].toUpperCase();
+                slot.textContent = icon;
+            }
+
+            // Show count if more than one
+            if (itemCounts[uniqueItems[i]] > 1) {
+                const countDiv = document.createElement('div');
+                countDiv.textContent = itemCounts[uniqueItems[i]];
+                countDiv.style.position = 'absolute';
+                countDiv.style.bottom = '2px';
+                countDiv.style.right = '6px';
+                countDiv.style.fontSize = '16px';
+                countDiv.style.color = '#FFD700';
+                countDiv.style.background = '#222a';
+                countDiv.style.borderRadius = '6px';
+                countDiv.style.padding = '0 4px';
+                slot.appendChild(countDiv);
+            }
+        } else {
+            slot.style.opacity = '0.4';
+        }
+        slots.appendChild(slot);
+    }
+
+    panel.appendChild(slots);
+
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    closeBtn.style.marginTop = '8px';
+    closeBtn.style.padding = '8px 24px';
+    closeBtn.style.fontSize = '18px';
+    closeBtn.style.background = '#FFD700';
+    closeBtn.style.color = '#222';
+    closeBtn.style.border = 'none';
+    closeBtn.style.borderRadius = '8px';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.onclick = function() {
+        overlay.remove();
+    };
+    panel.appendChild(closeBtn);
+
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+}
+
+window.addEventListener('DOMContentLoaded', createInventoryButton);
+
 console.log("pixelSize:", pixelSize, "isMobile:", isMobile, "UA:", navigator.userAgent);
