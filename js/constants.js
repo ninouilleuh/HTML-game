@@ -1,4 +1,9 @@
-const pixelSize = 14; // smaller value for more zoomed out view
+// Detect if on mobile device
+const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// Set pixelSize based on device type
+const pixelSize = isMobile ? 32 : 14; // More zoomed in on mobile, default on desktop
+
 const tileColors = {
     grass: "#4caf50",
     forest: "#2e7d32",
