@@ -1,6 +1,9 @@
 // Global message variable for UI feedback
 let message = "";
 
+// Selected item variable
+let selectedItem = null;
+
 // Draw message box if a message is set
 function drawMessage() {
     if (!message) return;

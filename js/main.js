@@ -16,7 +16,18 @@ placePlayer();
 spawnInitialEnemies(5);
 
 // Attach campfire click handler
-canvas.addEventListener('mousedown', handleCampfireClick);
+canvas.addEventListener('mousedown', function(e) {
+    // If a message is showing, dismiss it and do nothing else
+    if (typeof message !== "undefined" && message) {
+        message = "";
+        drawMap();
+        return;
+    }
+    // Try bonfire first, then campfire
+    // If bonfire handled the click, don't call campfire
+    if (handleBonfireClick(e)) return;
+    handleCampfireClick(e);
+});
 
 // Handle keyboard input for movement and crafting
 window.addEventListener('keydown', (e) => {
@@ -27,6 +38,23 @@ window.addEventListener('keydown', (e) => {
         return;
     }
 
+    // Inventory selection
+    if (e.key === "1") {
+        if (countInInventory("campfire") > 0) {
+            selectedItem = "campfire";
+            message = "Campfire selected. Click on the map to place it.";
+            drawMap();
+        }
+        return;
+    }
+    if (e.key === "2") {
+        if (countInInventory("bonfire") > 0) {
+            selectedItem = "bonfire";
+            message = "Bonfire selected. Click on the map to place it.";
+            drawMap();
+        }
+        return;
+    }
 
     // Movement
     switch (e.key) {
@@ -53,18 +81,23 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
+// Track last day for season system
+let lastDay = Math.floor(timeOfDay * 24);
 
 // Game loop: day/night and redraw
 function dayNightLoop() {
-    if (isDay()) {
-        timeOfDay += timeSpeedDay;
-    } else {
-        timeOfDay += timeSpeedNight;
-    }
-    if (timeOfDay > 1) timeOfDay -= 1;
     updateEnemies();
     updateForestFires();
+    updateDryGrass();
     drawMap();
+
+    // Advance season day at midnight
+    let currentHour = Math.floor(timeOfDay * 24);
+    if (lastDay > currentHour) { // timeOfDay wrapped around (new day)
+        advanceSeasonDay();
+    }
+    lastDay = currentHour;
+
     requestAnimationFrame(dayNightLoop);
 }
 
