@@ -7,8 +7,13 @@ window.pixelSize = window.isMobile ? 28 : 14; // 48 for mobile, 14 for desktop
 const tileColors = {
     grass: "#4caf50",
     forest: "#2e7d32",
+    hill: "#bdb76b",    // khaki or similar for hills
     water: "#2196f3",
-    mountain: "#888888"
+    mountain: "#888888",
+    snow: "#e0f7fa",
+    river : "#2196f3",
+
+    
 };
 
 // --- Add these for day/night cycle ---

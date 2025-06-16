@@ -1,21 +1,9 @@
 const enemies = [];
 
 // Spawn a few enemies at random walkable locations
-function spawnInitialEnemies(count = 5) {
-    let tries = 0;
-    while (enemies.length < count && tries < 1000) {
-        let ex = Math.floor(Math.random() * 100 - 50);
-        let ey = Math.floor(Math.random() * 100 - 50);
-        let tile = getTileType(ex, ey);
-        // Don't spawn on water, mountain, or player
-        if (tile !== "mountain" && tile !== "water" && !(ex === player.x && ey === player.y)) {
-            // Don't spawn on a campfire
-            if (!placedCampfires.has(`${ex},${ey}`)) {
-                enemies.push({ x: ex, y: ey, state: "idle" });
-            }
-        }
-        tries++;
-    }
+function spawnInitialEnemies(count = 0) {
+    // Disabled: do not spawn enemies for now
+    return;
 }
 
 // Draw enemies
@@ -89,14 +77,12 @@ function updateEnemies() {
 
         function canSeePlayer() {
             if (!hasLineOfSight(enemy.x, enemy.y, player.x, player.y)) {
-                //console.log(`Enemy at (${enemy.x},${enemy.y}) cannot see player (LOS blocked)`);
                 return false;
             }
             if (getTileType(player.x, player.y) === "forest" && dist > 4) {
-                //console.log(`Enemy at (${enemy.x},${enemy.y}) cannot see player (player deep in forest)`);
+               
                 return false;
             }
-            //console.log(`Enemy at (${enemy.x},${enemy.y}) CAN see player`);
             return true;
         }
 
@@ -130,12 +116,10 @@ function updateEnemies() {
                         }
                     );
                     if (enemy.chasePath && enemy.chasePath.length > 1) enemy.chasePath.shift();
-                    console.log(`Enemy at (${enemy.x},${enemy.y}) is pathfinding to player at (${player.x},${player.y}). Path found:`, enemy.chasePath ? enemy.chasePath.length : "none");
                 }
             } else {
                 enemy.chaseTimer++;
                 let secondsLeft = Math.max(0, 10 - enemy.chaseTimer / 60).toFixed(2);
-                //console.log(`Enemy at (${enemy.x},${enemy.y}) lost sight. Will stop tracking in ${secondsLeft}s`);
                 if (enemy.chaseTimer > 10 * 60) {
                     enemy.state = "searching";
                     enemy.searchTimer = 0;
@@ -154,7 +138,6 @@ function updateEnemies() {
             if (enemy.chasePath && enemy.chasePath.length) {
                 let next = enemy.chasePath.shift();
                 if (next) {
-                    console.log(`Enemy moves from (${enemy.x},${enemy.y}) to (${next.x},${next.y}) while chasing.`);
                     enemy.x = next.x;
                     enemy.y = next.y;
                 }
@@ -199,7 +182,6 @@ function updateEnemies() {
                     }
                 );
                 if (enemy.searchPath && enemy.searchPath.length > 1) enemy.searchPath.shift();
-                console.log(`Enemy at (${enemy.x},${enemy.y}) is searching for player at (${enemy.lastSeen.x},${enemy.lastSeen.y}). Path found:`, enemy.searchPath ? enemy.searchPath.length : "none");
             }
 
             // Move along the path
@@ -209,7 +191,6 @@ function updateEnemies() {
                 enemy.moveCooldown = 0;
                 let next = enemy.searchPath.shift();
                 if (next) {
-                    console.log(`Enemy moves from (${enemy.x},${enemy.y}) to (${next.x},${next.y}) while searching.`);
                     enemy.x = next.x;
                     enemy.y = next.y;
                 }
@@ -218,7 +199,6 @@ function updateEnemies() {
             // If player is seen again, resume chase
             let distToPlayer = Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y);
             if (distToPlayer <= 5 && canSeePlayer()) {
-                console.log(`Enemy at (${enemy.x},${enemy.y}) spotted the player again! Resuming chase.`);
                 enemy.state = "chasing";
                 enemy.chaseTimer = 0;
                 enemy.lastSeen = { x: player.x, y: player.y };
@@ -229,7 +209,6 @@ function updateEnemies() {
 
             // If reached last seen position or searched for 5 seconds, go idle
             if ((enemy.x === enemy.lastSeen.x && enemy.y === enemy.lastSeen.y) || enemy.searchTimer > 5 * 60) {
-                console.log(`Enemy at (${enemy.x},${enemy.y}) finished searching. Returning to idle.`);
                 enemy.state = "idle";
                 enemy.searchTimer = 0;
                 enemy.lastSeen = null;

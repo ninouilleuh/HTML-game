@@ -11,9 +11,9 @@ body {
     background: #222;
 }
 canvas, #mapCanvas {
+    background: transparent; /* or use your preferred color */
     display: block;
     margin: auto;
-    background: #111;
     position: absolute;
     top: 0;
     left: 0;
