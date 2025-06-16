@@ -134,9 +134,10 @@ function wrapY(y) {
 
 // Get the type of a tile at (x, y)
 function getTileType(x, y) {
+    const biome = getBiome(x, y);
     x = wrapX(x);
     y = wrapY(y);
-
+    //water first 
     // Rivers override other types
     if (riverTiles.has(`${x},${y}`)) {
         return "river";
@@ -148,7 +149,20 @@ function getTileType(x, y) {
         return "water";
     }
 
+    
+    //Elevation terrain types
     const elevation = getElevation(x, y);
+    if (biome === "tropical" && elevation < 120) {
+    const n = noise.noise2D(x * 0.2, y * 0.2) * 0.5 + 0.5;
+    if (n < 0.6) return "swamp"; // 30% swamp
+    if (n < 0.9) return "lake"; // 5% lake
+    // Otherwise, let it fall through to normal land
+}
+   // if (biome === "tropical" && elevation < 120 ) {
+        // Use noise for variety between swamp and lake
+        // 60% swamp, 40% lake
+     //   return "lake";
+   // }
 
     if (elevation <= 50) {
         // Sea level: water or beach
@@ -174,6 +188,7 @@ function getTileType(x, y) {
         // High mountains: peak, often snow-capped, snow, bare rock, cold
         return "snow";
     }
+    
 
     const key = `${x},${y}`;
     if (tileCache.has(key)) return tileCache.get(key);
@@ -313,6 +328,13 @@ function isPlayerDeepInForest() {
 function getTemperature(x, y) {
     x = wrapX(x);
     y = wrapY(y);
+
+    // Tropical: constant, hot, minimal seasonality
+    if (getBiome(x, y) === "tropical") {
+        const base = 27;
+        const variation = (noise.noise2D(x * 0.1, y * 0.1) * 4); // ±4°C
+        return Math.max(24, Math.min(32, base + variation));
+    }
 
     // Latitude: 0 at equator (y=0), 1 at poles (y=±5000)
     let latitudeNorm = Math.abs(y) / 5000; // 0 (equator) to 1 (pole)
@@ -476,17 +498,17 @@ function getHumidity(x, y) {
     humidity += waterBonus;
 
     // --- Vegetation cover modifier ---
-    const tileType = getTileType(x, y);
-    if (tileType === "forest") {
+  //  const tileType = getTileType(x, y);
+  //  if (tileType === "forest") {
         // Use noise for deterministic "randomness"
-        let n = noise.noise2D(x * 0.1 + 1234, y * 0.1 - 5678) * 0.5 + 0.5; // 0..1
-        humidity += 20 + n * 10; // +20–30%
-    } else if (tileType === "grass" || tileType === "hill") {
-        let n = noise.noise2D(x * 0.1 + 4321, y * 0.1 - 8765) * 0.5 + 0.5;
-        humidity += 5 + n * 5; // +5–10%
-    } else if (tileType === "desert" || tileType === "bare" || tileType === "mountain" || tileType === "snow") {
+   //     let n = noise.noise2D(x * 0.1 + 1234, y * 0.1 - 5678) * 0.5 + 0.5; // 0..1
+  //      humidity += 20 + n * 10; // +20–30%
+ //   } else if (tileType === "grass" || tileType === "hill") {
+  //      let n = noise.noise2D(x * 0.1 + 4321, y * 0.1 - 8765) * 0.5 + 0.5;
+  //      humidity += 5 + n * 5; // +5–10%
+  //  } else if (tileType === "desert" || tileType === "bare" || tileType === "mountain" || tileType === "snow") {
         // 0 bonus for bare/desert/mountain/snow
-    }
+ //   }
 
     // --- Prevailing wind humidity bonus ---
     humidity += getWindHumidityBonus(x, y);
@@ -506,6 +528,27 @@ function getHumidity(x, y) {
     // Adjust for subtropical regions
     if (getBiome(x, y) === "subtropical") {
         humidity -= 25; // much drier air in subtropics
+    }
+
+    // Reduce humidity in polar regions
+    if (getBiome(x, y) === "polar") {
+        humidity -= 20; // Very dry
+    }
+    
+
+    // Tropical: nearly saturated air, 85–100% humidity
+    if (getBiome(x, y) === "tropical") {
+        const base = 92;
+        const variation = (noise.noise2D(x * 0.13, y * 0.13) * 8); // ±8%
+        humidity = Math.max(85, Math.min(100, base + variation));
+    }
+    // Increase humidity near rivers
+    for (let dx = -3; dx <= 3; dx++) {
+        for (let dy = -3; dy <= 3; dy++) {
+            if (riverTiles.has(`${wrapX(x + dx)},${wrapY(y + dy)}`)) {
+                humidity += 15 - 3 * (Math.abs(dx) + Math.abs(dy));
+            }
+        }
     }
 
     // Clamp to 0..100
@@ -787,22 +830,6 @@ function addRiver(startX, startY) {
     }
 }
 
-// Patch getHumidity to increase humidity near rivers
-const originalGetHumidity = getHumidity;
-getHumidity = function(x, y) {
-    let humidity = originalGetHumidity(x, y);
-    // Increase humidity near rivers
-    for (let dx = -3; dx <= 3; dx++) {
-        for (let dy = -3; dy <= 3; dy++) {
-            if (riverTiles.has(`${wrapX(x + dx)},${wrapY(y + dy)}`)) {
-                humidity += 15 - 3 * (Math.abs(dx) + Math.abs(dy));
-            }
-        }
-    }
-    // Clamp to 0..100
-    humidity = Math.max(0, Math.min(100, humidity));
-    return Math.round(humidity);
-};
 
 // Example: generate a few rivers at world generation
 // Random river count between 50 and 200
@@ -1093,57 +1120,4 @@ function getBiome(x, y) {
     return "default";
 }
 
-// Patch getHumidity to reduce humidity in polar regions
-const originalGetHumidity2 = getHumidity;
-getHumidity = function(x, y) {
-    let humidity = originalGetHumidity2(x, y);
-    // Reduce humidity in polar regions
-    if (getBiome(x, y) === "polar") {
-        humidity -= 20; // Very dry
-    }
-    return humidity;
-};
 
-// Patch getTemperature to handle tropical regions
-const originalGetTemperature = getTemperature;
-getTemperature = function(x, y) {
-    let temp = originalGetTemperature(x, y);
-
-    if (getBiome(x, y) === "tropical") {
-        // Tropical: constant, hot, minimal seasonality
-        // Use noise for some variation, but clamp to 24–32°C
-        const base = 27;
-        const variation = (noise.noise2D(x * 0.1, y * 0.1) * 4); // ±4°C
-        temp = Math.max(24, Math.min(32, base + variation));
-        // Ignore seasonality in tropics
-    }
-
-    return temp;
-};
-
-// Patch getHumidity to handle tropical regions
-const originalGetHumidity3 = getHumidity;
-getHumidity = function(x, y) {
-    let humidity = originalGetHumidity3(x, y);
-
-    if (getBiome(x, y) === "tropical") {
-        // Tropical: nearly saturated air, 85–100% humidity
-        const base = 92;
-        const variation = (noise.noise2D(x * 0.13, y * 0.13) * 8); // ±8%
-        humidity = Math.max(85, Math.min(100, base + variation));
-    }
-
-    // ...other biome logic...
-
-    return humidity;
-};
-
-if (biome === "tropical" && timeOfDay > 0.5 && timeOfDay < 0.8) {
-    chance *= 1.5; // Afternoon storms more likely
-}
-
-if (biome === "tropical") {
-    tile.rain_age = 30; // Longer rain events in tropics
-} else {
-    tile.rain_age = 20;
-}

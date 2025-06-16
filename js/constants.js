@@ -12,7 +12,8 @@ const tileColors = {
     mountain: "#888888",
     snow: "#e0f7fa",
     river : "#2196f3",
-
+    lake : "#6db3c7",
+    swamp : "#7e9e6c",
     
 };
 
