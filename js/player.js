@@ -1,3 +1,42 @@
+// ORGANIZATION RULES:
+
+// YES:
+
+//Player state and data:
+//The player object (position, color, inventory, etc.).
+//Player movement logic:
+//Functions like movePlayer(dx, dy) that handle moving the player and checking for valid tiles.
+//Player placement logic:
+//Functions like placePlayer() to spawn the player at the start.
+//Player-specific events:
+//Logic for random events that happen to the player (e.g., finding sticks).
+//Helpers for player actions:
+//Any helpers that are only used for the player (e.g., player health, stamina, etc., if you add them).
+
+// NO:
+
+//Enemy, campfire, or map logic:
+//E.g., enemy AI, fire spreading, map drawing (except calling drawMap() after moving).
+//General-purpose utility functions:
+//E.g., wrapX, getTileType, isNearForest (unless only used by player logic).
+//Inventory management functions:
+//E.g., countInInventory, removeFromInventory (should be in inventory.js).
+//Constants/configuration:
+//E.g., tile colors, season names, etc. (should be in constants.js).
+//Rendering logic for non-player entities:
+//E.g., drawing enemies, campfires, or the map itself (should be in their respective files).
+//Game loop or orchestration code:
+//E.g., main game loop, input handling, or startup logic (should be in main.js).
+
+////                    DOES NOT GO HERE!                    ////
+
+//Enemy/campfire logic
+//General utility functions (unless only used by player)
+//Inventory management helpers (unless only for player)
+//Game constants/configuration
+//Main game loop or input handling
+
+
 const player = {
     x: 0,
     y: 0,

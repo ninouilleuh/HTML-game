@@ -1,3 +1,35 @@
+// ORGANIZATION RULES:
+
+// YES:
+
+//All logic related to enemies:
+//The enemies array (tracking all enemy objects).
+//Functions for spawning, updating, and drawing enemies (e.g., spawnInitialEnemies, updateEnemies, drawEnemies).
+//Enemy AI and state management (e.g., chasing, searching, idle).
+//Pathfinding logic used by enemies (e.g., findPath).
+//Any enemy-specific helper functions (e.g., canSeePlayer if only used by enemies).
+
+
+// NO:
+
+//General-purpose utility functions:
+//E.g., wrapX, wrapY, getTileType (unless only used for enemy logic).
+//Player logic:
+//E.g., player movement, inventory, or health (should be in player.js or inventory.js).
+//Rendering logic for non-enemy entities:
+//E.g., drawing campfires, tiles, or UI (should be in their respective files).
+//Constants/configuration unrelated to enemies:
+//E.g., tile colors, season names, etc. (should be in constants.js).
+//Game loop or orchestration code:
+//E.g., main game loop, input handling, or startup logic (should be in main.js).
+
+////                    DOES NOT GO HERE!                    ////
+
+//General map or player logic
+//Non-enemy rendering or state
+//Game constants/config unrelated to enemies
+//Main game loop or input handling
+
 const enemies = [];
 
 // Spawn a few enemies at random walkable locations

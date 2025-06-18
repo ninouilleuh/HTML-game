@@ -1,0 +1,17 @@
+[gd_scene load_steps=4 format=3 uid="uid://pfmbets05ulg"]
+
+[ext_resource type="Script" uid="uid://vheosc3x2hvu" path="res://script/main.gd" id="1_jyhfs"]
+[ext_resource type="TileSet" uid="uid://ddrgf4g0fv8o" path="res://tiles/terrain_tileset.tres" id="1_o5qli"]
+[ext_resource type="Script" uid="uid://dy2gnfpnfoaqq" path="res://script/map_generator.gd" id="2_0wfyh"]
+
+[node name="Node2D" type="Node2D"]
+script = ExtResource("1_jyhfs")
+
+[node name="TileMap" type="TileMap" parent="."]
+tile_set = ExtResource("1_o5qli")
+format = 2
+script = ExtResource("2_0wfyh")
+
+[node name="DEBUG" type="Camera2D" parent="."]
+enabled = false
+zoom = Vector2(0.01, 0.01)

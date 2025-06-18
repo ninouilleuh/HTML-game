@@ -1,26 +1,64 @@
+// ORGANIZATION RULES:
+
+// YES:
+
+//Game startup logic:
+//Code that initializes the game, sets up the canvas, and starts the main loop.
+//Event listeners for game start:
+//E.g., window.addEventListener('DOMContentLoaded', ...) and the call to startGame().
+//UI and input setup:
+//Code for handling keyboard, mouse, and touch controls.
+//Main game loop(s):
+//Functions like dayNightLoop() or any loop that advances the game state.
+//High-level orchestration:
+//Calls to functions that live in other modules/files (like drawMap(), updateEnemies(), etc.).
+//Minimal global variables needed for orchestration.
+
+// NO:
+
+// Detailed game logic for specific systems:
+//E.g., enemy AI, map generation, precipitation, inventory management, etc.
+//(These should be in their own files: enemy.js, map.js, utils.js, inventory.js, etc.)
+//Definitions of constants and configuration:
+//E.g., tile colors, season names, pixel size, etc. (These belong in constants.js.)
+//Reusable utility functions:
+//E.g., noise functions, biome checks, math helpers (These belong in utils.js.)
+//Rendering logic for specific systems:
+//E.g., how to draw a campfire, enemy, or tile (These belong in their respective modules.)
+//Game state variables that are only relevant to a subsystem:
+//E.g., enemy arrays, fire arrays, player inventory (These should be in their own modules.)
+
+////                    DOES NOT GO HERE!                    ////
+
+// The actual logic for updating enemies/fires (should be in enemy.js/campfire.js)
+// Drawing logic for inventory items (could be in inventory.js or ui.js)
+// Any constants or configuration (should be in constants.js)
+// Any detailed game mechanics (should be in their own modules)
+
+// Get canvas and context for drawing
 window.canvas = document.getElementById("mapCanvas");
 window.ctx = canvas.getContext("2d");
 
 
 // Set canvas size and handle resizing
 function resizeCanvas() {
-    canvas.width = window.innerWidth;
+    canvas.width = window.innerWidth; 
     canvas.height = window.innerHeight;
 }
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+window.addEventListener('resize', resizeCanvas);  // Update canvas size on window resize
+resizeCanvas(); // Set initial canvas size
 
-// Wrap your game setup in a function
+// Main game setup function
 function startGame() {
     // Place player on first load
     placePlayer();
 
     // Spawn initial enemies
-    spawnInitialEnemies(5);
+   // spawnInitialEnemies(5);
 
-    // Attach campfire click handler
+   // Attach mouse click handler for campfire/bonfire and message dismissal
     canvas.addEventListener('mousedown', function(e) {
-        // If a message is showing, dismiss it and do nothing else
+         // If a message is showing, dismiss it and redraw map
         if (typeof message !== "undefined" && message) {
             message = "";
             drawMap();
@@ -44,7 +82,7 @@ function startGame() {
     const MOVE_REPEAT_INTERVAL = 30;
 
     let moveIntervalId = null;
-
+    // Handle movement based on pressed keys
     function handleMovementFromKeys() {
         let dx = 0, dy = 0;
         if (movementKeys.left) dx -= 1;
@@ -60,6 +98,7 @@ function startGame() {
     let lastMoveTime = 0;
     const MOVE_INTERVAL = 10; // ms entre chaque déplacement du joueur
 
+    // Loop for continuous movement while key is held
     function movementLoop() {
         if (!moving) return;
         const now = performance.now();
@@ -83,7 +122,7 @@ function startGame() {
         moving = false;
     }
 
-    // Handle keyboard input for movement and crafting
+    // Keyboard input for movement and inventory selection
     window.addEventListener('keydown', (e) => {
         // Dismiss message with Space or Enter
         if (typeof message !== "undefined" && message && (e.key === " " || e.key === "Enter" || e.key === "Spacebar")) {
@@ -92,7 +131,7 @@ function startGame() {
             return;
         }
 
-        // Inventory selection
+        // Inventory selection with 1 or 2
         if (e.key === "1") {
             if (countInInventory("campfire") > 0) {
                 selectedItem = "campfire";
@@ -138,7 +177,7 @@ function startGame() {
     });
 
     window.addEventListener('keyup', (e) => {
-        let changed = false;
+        let changed = false; //WHAT ? XXX
         switch (e.key) {
             case 'ArrowUp':
             case 'w':
@@ -168,11 +207,11 @@ function startGame() {
     });
 
     // Track last day for season system
-    let lastDay = Math.floor(timeOfDay * 24);
+    let lastDay = Math.floor(timeOfDay * 24); // MOVE THIS
 
     let dryGrassFrame = 0;
-    function dayNightLoop() {
-        // --- Move time update here ---
+    function dayNightLoop() { //ISNT THIS THE SAME AS THE ONE IN constant.js?
+        // Update time of day
         if (isDay()) {
             timeOfDay += timeSpeedDay;
             window._absoluteTimeOfDay += timeSpeedDay;
@@ -181,7 +220,7 @@ function startGame() {
             window._absoluteTimeOfDay += timeSpeedNight;
         }
         if (timeOfDay > 1) timeOfDay -= 1;
-
+        // Update enemies, fires, dry grass, and redraw map
         updateEnemies();
         updateForestFires();
         if (dryGrassFrame % 20 === 0) updateDryGrass();
@@ -195,7 +234,7 @@ function startGame() {
         }
         lastDay = currentHour;
 
-        requestAnimationFrame(dayNightLoop);
+        requestAnimationFrame(dayNightLoop);// Loop again
     }
 
     // Initial draw and start loop
@@ -403,7 +442,7 @@ function startGame() {
     if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
         window.addEventListener('DOMContentLoaded', createMobileJoystick);
     }
-
+    // Inventory button for mobile/desktop
     function createInventoryButton() {
         if (document.getElementById('inventory-btn')) return;
 
@@ -430,7 +469,7 @@ function startGame() {
         document.body.appendChild(btn);
     }
 
-    // Inventory box UI
+    // Inventory overlay UI
     function showInventoryBox() {
         // Remove existing box if any
         let oldBox = document.getElementById('inventory-box');
@@ -657,25 +696,23 @@ function startGame() {
     // Create the inventory button now that the game is ready
     createInventoryButton();
 
-    // Add this at the end of your main.js, after all game setup and the first drawMap():
+     // Hide loading screen after everything is ready
     window.addEventListener('load', () => {
         // Hide loading screen after everything is ready
         const loading = document.getElementById('loading-screen');
         if (loading) loading.style.display = 'none';
     });
 
-    console.log("pixelSize:", pixelSize, "isMobile:", isMobile, "UA:", navigator.userAgent);
-
-    // When map is ready and first drawMap() is called:
+     // Hide loading bar when ready
     window.loadingBarShouldRun = false;
 }
 
-// Instead of running setup immediately, wait for the animation to start
+// Wait for DOM to be ready, then start game after a short delay GAME STARTS HERE
 window.addEventListener('DOMContentLoaded', () => {
     setTimeout(startGame, 1200); // Let the loading bar animate for a bit first
 });
 
-// Example: staggered enemy and fire updates for better performance
+// --- Staggered enemy and fire updates for better performance ---
 
 let enemyUpdateIndex = 0;
 let fireUpdateIndex = 0;
@@ -700,7 +737,7 @@ function updateFiresStaggered() {
     }
 }
 
-// In your main game loop, call these instead of updating all at once:
+// Example: in a custom game loop, you would call these instead of updating all at once: // REMOVE THIS 
 function gameLoop() {
     // ...other game logic...
 

@@ -1,3 +1,40 @@
+// ORGANIZATION RULES:
+
+// YES:
+
+//All logic related to campfires and bonfires:
+//Placing, lighting, and drawing campfires/bonfires.
+//Tracking their state (lit/unlit, burning, burnt, etc.).
+//Crafting campfires/bonfires.
+//Burning and spreading fire to forests.
+//Drawing campfires/bonfires on the map.
+//Special tile effects related to fire (burnt, fresh grass, etc.).
+//Helpers specific to campfire/bonfire mechanics:
+//E.g., trySpreadForestFire, updateForestFires, drawCampfires, drawBonfires, etc.
+
+// NO:
+
+//General-purpose utility functions:
+//E.g., wrapX, wrapY, getWrappedDelta, isCoordVisible (these belong in utils.js).
+//Global tile color definitions:
+//E.g., tileColors.burnt, tileColors.fresh, tileColors.bonfire (these belong in constants.js).
+//General map or tile logic:
+//E.g., getTileType, isNearType (unless only used for campfire/bonfire logic).
+//Player inventory management (unless only for campfire/bonfire crafting):
+//General inventory logic should be in inventory.js.
+//Event listeners for unrelated keys:
+//Only handle keys related to campfire/bonfire crafting here.
+//Rendering logic for unrelated systems:
+//Only draw campfires/bonfires here, not other map elements.
+
+////                    DOES NOT GO HERE!                    ////
+
+//wrapX, wrapY, getWrappedDelta, isCoordVisible, isYVisible (should be in utils.js)
+//tileColors.burnt, tileColors.fresh, tileColors.bonfire (should be in constants.js)
+//Any logic for unrelated tile types or general map rendering
+
+
+
 
 // Wrap x into [-5000, 5000]
 function wrapX(x) {
@@ -499,6 +536,3 @@ function isYVisible(fy, startY, tilesY) {
     return rel >= 0 && rel < tilesY;
 }
 
-// Call updateForestFires in your main game loop (main.js):
-// Add this line in dayNightLoop() before drawMap():
-// updateForestFires();

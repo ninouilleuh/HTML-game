@@ -1,3 +1,36 @@
+// ORGANIZATION RULES:
+
+// YES:
+
+//User Interface (UI) drawing and feedback functions:
+//Functions for drawing message boxes, overlays, info panels, and debug displays (e.g., drawMessage, drawTopLeftDebugOverlay, drawTopRightInfoBox).
+//UI state variables:
+//Variables for UI feedback, such as message and selectedItem.
+//Helpers for UI rendering:
+//Any helper functions used only for UI drawing or feedback.
+
+// NO:
+
+//Game logic unrelated to UI:
+//E.g., player movement, enemy AI, map generation, inventory management, etc.
+//General-purpose utility functions:
+//E.g., wrapX, getBiome, etc.
+//Constants/configuration unrelated to UI:
+//E.g., tile colors, season names, etc. (should be in constants.js).
+//Rendering logic for non-UI/gameplay systems:
+//E.g., drawing the map, enemies, or campfires (should be in their respective files).
+//Event listeners for gameplay or input:
+//E.g., movement keys, map clicks, etc. (should be in main.js or input modules).
+
+////                    DOES NOT GO HERE!                    ////
+
+//Player, enemy, or campfire logic
+//General utility functions
+//Non-UI rendering (map, enemies, etc.)
+//Unrelated constants/configuration
+//Input/gameplay event listeners
+
+
 // Global message variable for UI feedback
 let message = "";
 

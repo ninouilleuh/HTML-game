@@ -1,3 +1,36 @@
+// ORGANIZATION RULES:
+
+// YES:
+
+//All logic related to lighting and darkness:
+//Functions for calculating and drawing day/night overlays (drawDayNightOverlay, drawDayNightOverlayWithCampfireLight).
+//Functions for light sources (campfires, bonfires) and their effect on darkness.
+//Helpers for calculating darkness bonuses (e.g., getForestDarknessBonus).
+//Any code that determines how light/dark the map appears, including forest darkness, time of day, and light radius.
+//Any helpers for rendering or calculating light/darkness overlays.
+
+// NO:
+
+//General-purpose utility functions:
+//E.g., wrapX, wrapY, getTileType (unless only used for lighting).
+//Campfire/bonfire placement or burning logic:
+//(Should be in campfire.js unless it directly affects lighting.)
+//Map rendering logic unrelated to lighting:
+//(Should be in map.js.)
+//Constants/configuration unrelated to lighting:
+//(Should be in constants.js.)
+//Game state management:
+//(Should be in a state or main file.)
+//Enemy/player logic:
+//(Should be in enemy.js or player.js.)
+
+////                    DOES NOT GO HERE!                    ////
+
+//Campfire/bonfire placement, burning, or crafting logic
+//General map drawing (not related to lighting)
+//Utility functions not used by lighting (move to utils.js if used elsewhere)
+//Any unrelated game logic or state
+
 function getForestDarknessBonus() {
     if (typeof getTileType !== "function") return 0;
     if (getTileType(player.x, player.y) !== "forest") return 0;

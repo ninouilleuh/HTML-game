@@ -1,0 +1,162 @@
+[gd_scene load_steps=7 format=3 uid="uid://pfmbets05ulg"]
+
+[ext_resource type="Script" uid="uid://vheosc3x2hvu" path="res://script/main.gd" id="1_jyhfs"]
+[ext_resource type="TileSet" uid="uid://ddrgf4g0fv8o" path="res://tiles/terrain_tileset.tres" id="1_o5qli"]
+[ext_resource type="Script" uid="uid://dy2gnfpnfoaqq" path="res://script/map_generator.gd" id="2_0wfyh"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sugp2"]
+bg_color = Color(0, 0, 0, 0.490196)
+corner_radius_top_left = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 10
+
+[sub_resource type="SystemFont" id="SystemFont_sugp2"]
+font_italic = true
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jyhfs"]
+bg_color = Color(0.294296, 0.190396, 0.0871399, 1)
+
+[node name="Node2D" type="Node2D"]
+script = ExtResource("1_jyhfs")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="TimePanel" type="Panel" parent="UI"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -54.0
+offset_right = 2.0
+offset_bottom = 33.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_sugp2")
+
+[node name="TimeLabel" type="Label" parent="UI/TimePanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.5
+offset_top = -14.5
+offset_right = 20.5
+offset_bottom = 34.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.873303, 0.901717, 7.70092e-07, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_fonts/font = SubResource("SystemFont_sugp2")
+text = "00:00
+"
+horizontal_alignment = 2
+
+[node name="HarvestButton" type="Button" parent="UI"]
+visible = false
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -15.5
+offset_right = 69.0
+offset_bottom = 15.5
+grow_vertical = 2
+text = "Harvest"
+
+[node name="InventoryButton" type="Button" parent="UI"]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -83.0
+offset_top = -31.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "Inventory"
+
+[node name="InventoryWindow" type="Panel" parent="UI"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BackpackFrame" type="Panel" parent="UI/InventoryWindow"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -142.0
+offset_top = -20.0
+offset_right = 172.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_jyhfs")
+
+[node name="Label" type="Label" parent="UI/InventoryWindow/BackpackFrame"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -37.0
+offset_right = 37.0
+offset_bottom = 23.0
+grow_horizontal = 2
+text = "BackPack"
+horizontal_alignment = 1
+vertical_alignment = 1
+justification_flags = 171
+
+[node name="SlotContainer" type="GridContainer" parent="UI/InventoryWindow/BackpackFrame"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 5
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/InventoryWindow/BackpackFrame"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+layer = 0
+
+[node name="DayNightOverlay" type="ColorRect" parent="CanvasLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="TileMap" type="TileMap" parent="."]
+tile_set = ExtResource("1_o5qli")
+format = 2
+script = ExtResource("2_0wfyh")
+
+[node name="DEBUG" type="Camera2D" parent="."]
+enabled = false
+zoom = Vector2(0.01, 0.01)
+
+[connection signal="pressed" from="UI/HarvestButton" to="." method="_on_harvest_button_pressed"]
+[connection signal="pressed" from="UI/InventoryButton" to="." method="_on_inventory_button_pressed"]

@@ -1,31 +1,74 @@
-let needsRedraw = true;
+// ORGANIZATION RULES:
 
+// YES:
+
+//Map rendering logic:
+//Functions that draw the map, tiles, overlays, and UI elements related to the map.
+//Redraw/requestRedraw logic:
+//Functions and flags that determine when the map needs to be redrawn.
+//Viewport calculations:
+//Code that determines which tiles are visible and how to center the player.
+//Overlay drawing:
+//Functions for drawing overlays on the map (e.g., rain, clouds, debug info).
+//Map-related event handlers:
+//Functions that respond to map changes (e.g., onPlayerMove, onSeasonChange).
+//Map-specific state:
+//E.g., needsRedraw flag.
+
+// NO:
+
+//Game logic unrelated to map rendering:
+//E.g., enemy AI, player movement, inventory management, campfire logic, etc.
+//General-purpose utility functions:
+//E.g., wrapX, getBiome, getTileType (unless only used for rendering).
+//Constants/configuration:
+//E.g., tile colors, season names, etc. (should be in constants.js).
+//Simulation or world generation logic:
+//E.g., precipitation simulation, river generation, erosion, etc.
+//Direct game state management:
+//E.g., advancing seasons, updating player state, etc. (unless it directly affects rendering).
+//Input handling:
+//Keyboard, mouse, or touch event listeners (should be in main.js or UI modules).
+
+////                    DOES NOT GO HERE!                    ////
+
+//Enemy update logic, campfire/fire logic, player movement logic
+//Utility functions not specific to rendering (should be in utils.js)
+//Game constants/configuration (should be in constants.js)
+//Simulation logic (e.g., updatePrecipitation should be called elsewhere, not as part of rendering)
+//Input event listeners
+
+
+let needsRedraw = true; //Flag to indicate if the map needs redrawing
+// Main function to draw the map and all overlays UI
 function drawMap() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height); //Clear the canvas
 
-    // Increase render distance: add more tiles to each side
-    const extraTiles = 3; // Increase this for even more distance
+    // Calculate how many tiles to draw based on canvas size and pixel size
+    const extraTiles = 3; // Extra tiles for render distance
     const tilesX = Math.ceil(canvas.width / pixelSize);
     const tilesY = Math.ceil(canvas.height / pixelSize);
     const radiusX = Math.ceil(tilesX / 2);
     const radiusY = Math.ceil(tilesY / 2);
 
+    // Calculate the top-left tile to start drawing from, centered on player
     const startX = player.x - Math.floor(tilesX / 2);
     const startY = player.y - Math.floor(tilesY / 2);
 
+    // Calculate pixel offsets to center the player on screen
     const offsetX = Math.floor(canvas.width / 2 - (player.x - startX) * pixelSize - pixelSize / 2);
     const offsetY = Math.floor(canvas.height / 2 - (player.y - startY) * pixelSize - pixelSize / 2);
     
-    // 1. Draw terrain
+    // 1. Draw terrain tiles
     for (let dx = 0; dx < tilesX; dx++) {
         for (let dy = 0; dy < tilesY; dy++) {
-            const worldX = wrapX(startX + dx);
-            const worldY = wrapY(startY + dy);
-            const tileType = getTileType(worldX, worldY);
-            ctx.fillStyle = tileColors[tileType];
-            ctx.fillRect(dx * pixelSize + offsetX, dy * pixelSize + offsetY, pixelSize, pixelSize);
+            const worldX = wrapX(startX + dx); // World X coordinate
+            const worldY = wrapY(startY + dy); // World Y coordinate
+            const tileType = getTileType(worldX, worldY); // Get tile type (e.g., grass, water)
+            ctx.fillStyle = tileColors[tileType]; // Set color for this tile type
+            ctx.fillRect(dx * pixelSize + offsetX, dy * pixelSize + offsetY, pixelSize, pixelSize); // Draw tile
 
-            // Tropical biome tint
+            // Draw biome tints as overlays for visual distinction
             const biome = getBiome(worldX, worldY);
             if (biome === "tropical") {
                 ctx.save();
@@ -34,7 +77,6 @@ function drawMap() {
                 ctx.fillRect(dx * pixelSize + offsetX, dy * pixelSize + offsetY, pixelSize, pixelSize);
                 ctx.restore();
             }
-            // Subtropical biome tint - NEW
             if (biome === "subtropical") {
                 ctx.save();
                 ctx.globalAlpha = 0.18;
@@ -42,7 +84,6 @@ function drawMap() {
                 ctx.fillRect(dx * pixelSize + offsetX, dy * pixelSize + offsetY, pixelSize, pixelSize);
                 ctx.restore();
             }
-            // Temperate biome tint - NEW
             if (biome === "temperate") {
                 ctx.save();
                 ctx.globalAlpha = 0.18;
@@ -50,7 +91,6 @@ function drawMap() {
                 ctx.fillRect(dx * pixelSize + offsetX, dy * pixelSize + offsetY, pixelSize, pixelSize);
                 ctx.restore();
             }
-            // Subpolar biome tint - NEW
             if (biome === "subpolar") {
                 ctx.save();
                 ctx.globalAlpha = 0.18;
@@ -58,7 +98,6 @@ function drawMap() {
                 ctx.fillRect(dx * pixelSize + offsetX, dy * pixelSize + offsetY, pixelSize, pixelSize);
                 ctx.restore();
             }
-            // Polar biome tint - NEW
             if (biome === "polar") {
                 ctx.save();
                 ctx.globalAlpha = 0.18;
@@ -69,12 +108,12 @@ function drawMap() {
         }
     }
 
-    // 2. Draw placed campfires
+        // 2. Draw placed campfires (if function exists)
     if (typeof drawCampfires === "function") {
         drawCampfires(offsetX, offsetY, startX, startY, tilesX, tilesY);
     }
 
-    // 3. Draw enemies
+    // 3. Draw enemies (if function exists)
     if (typeof drawEnemies === "function") {
         drawEnemies(offsetX, offsetY, startX, startY, tilesX, tilesY);
     }
@@ -98,12 +137,12 @@ function drawMap() {
         drawDayNightOverlay();
     }
 
-    // --- UI LAYOUT FIX ---
+    // Draw debug overlay (if function exists)
     if (typeof drawTopLeftDebugOverlay === "function") {
         drawTopLeftDebugOverlay();
     }
 
-    // Top right: hour, temp, day/season, humidity
+    // Draw top right info box (time, temp, humidity, wind, season)
     ctx.save();
     const boxWidth = 220;
     const boxHeight = 90; // Increased height for humidity line
@@ -133,7 +172,7 @@ function drawMap() {
         ctx.fillText(`Humidity: ${humidity}%`, x + 8, y);
         y += 20;
     }
-    // Wind Direction - NEW
+    // Wind Direction
     if (typeof getPrevailingWindDirection === "function") {
         const windDir = getPrevailingWindDirection(player.y);
         let windStr = "";
@@ -164,18 +203,17 @@ function drawMap() {
             updatePrecipitation(tileCache[key]);
         }
     }
-
+     // Draw rain and cloud overlays
     if (typeof drawRainOverlay === "function") {
     drawRainOverlay();
 }
 
-    // Message box (centered, always on top)
+   // Draw message box (if function exists)
     if (typeof drawMessage === "function") {
         drawMessage();
     }
 
-    // Remove old UI block at top left (was overlapping)
-
+ // Update time of day
     if (isDay()) {
         timeOfDay += timeSpeedDay;
         window._absoluteTimeOfDay += timeSpeedDay;
@@ -188,15 +226,15 @@ function drawMap() {
    
 }
 
-// Call this whenever something changes that should trigger a redraw:
+// Call this whenever something changes that should trigger a redraw
 function requestRedraw() {
     needsRedraw = true;
 }
 
-// Main game loop:
+// Main game loop: redraws map if needed, then schedules next frame // REMOVE THIS ?
 function gameLoop() {
     // ...update logic...
-
+    
     if (needsRedraw) {
         drawMap();
         needsRedraw = false;
@@ -206,12 +244,12 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Example triggers:
+// Example: call when player moves to trigger redraw // REMOVE THIS ?
 function onPlayerMove() {
     // ...move player...
     requestRedraw();
 }
-
+// Example: call when season changes to trigger redraw
 function onSeasonChange() {
     // Advance to the next season
     const seasons = ["spring", "summer", "autumn", "winter"];
@@ -219,19 +257,17 @@ function onSeasonChange() {
     if (currentIndex === -1) currentIndex = 0;
     currentSeason = seasons[(currentIndex + 1) % seasons.length];
     seasonDay = 0; // Reset day counter for new season
-
     // Optionally, update any season-dependent variables here
-
     requestRedraw();
 }
 
-// Call requestRedraw() in any place where the map should update visually.
 
+// Optionally draw a top right info box (if function exists)
 if (typeof drawTopRightInfoBox === "function") {
     drawTopRightInfoBox();
 }
 
-
+// Draw rain and cloud overlays on top of terrain
 function drawRainOverlay() {
     const tilesX = Math.ceil(canvas.width / pixelSize);
     const tilesY = Math.ceil(canvas.height / pixelSize);

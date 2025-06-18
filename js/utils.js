@@ -1,4 +1,48 @@
-// Simplex noise for natural terrain
+// ORGANIZATION RULES:
+
+// YES:
+
+//Utility/helper functions that are used across the game and are not specific to one system.
+//Examples: wrapX, wrapY, getBiome, isNearWater, hasLineOfSight, etc.
+//General-purpose algorithms (e.g., noise generation, Bresenham’s line, etc.).
+//Reusable logic for terrain, weather, or tile calculations that could be called from anywhere.
+//Stateless or mostly stateless helpers (functions that don’t depend on or mutate global game state, or only do so in a controlled way).
+
+// NO:
+
+//Game state variables (e.g., tileCache, activeRainTiles, activeCloudTiles, dryGrassTiles, riverTiles, etc.).
+//Core game logic or simulation loops (e.g., river generation, precipitation simulation, erosion simulation, etc.).
+//World generation or initialization code (e.g., code that generates rivers at startup).
+//Constants/configuration (e.g., WORLD_X_MIN, WORLD_X_MAX, DRY_GRASS_HUMIDITY_THRESHOLD—these belong in constants.js).
+//Patches or overrides of core functions (e.g., patching getTileType or getElevation).
+//Direct DOM manipulation or rendering code (should be in UI or rendering modules).
+
+////                    DOES NOT GO HERE!                    ////
+
+//Stateful variables:
+//activeRainTiles, activeCloudTiles, tileCache, dryGrassTiles, riverTiles, erosionMap, valleyMap
+//World constants:
+//WORLD_X_MIN, WORLD_X_MAX, WORLD_Y_MIN, WORLD_Y_MAX, DRY_GRASS_HUMIDITY_THRESHOLD
+//World generation logic:
+//The for-loop that generates rivers at startup, and addRiver
+//Patching functions:
+//The patch for getTileType and getElevation
+//Direct simulation logic:
+//updatePrecipitation, updateDryGrass, carveValleyAlongRiver
+
+
+
+
+// -- RAIN -- //
+//  Active rain and cloud tiles sets for efficient updates
+
+// MOVE  THIS TO CONSTANTS? XXX //
+const activeRainTiles = new Set();
+const activeCloudTiles = new Set();
+
+// -- TERRAIN GENERATION -- //
+
+// Simplex noise class for natural terrain generation
 class SimplexNoise {
     constructor(seed = 0) {
         this.p = new Uint8Array(256);
@@ -15,6 +59,9 @@ class SimplexNoise {
     }
     dot(g, x, y) { return g[0] * x + g[1] * y; }
     noise2D(xin, yin) {
+        // ...Simplex noise math for 2D...
+        // Returns a pseudo-random value for (xin, yin)
+        // Used for terrain, humidity, etc.
         const grad3 = [
             [1,1],[-1,1],[1,-1],[-1,-1],
             [1,0],[-1,0],[1,0],[-1,0],
@@ -54,24 +101,26 @@ class SimplexNoise {
 }
 
 // Generate a random seed for each reload
+// MOVE THIS TO CONSTANTS? XXX //
 const seed = Math.floor(Math.random() * 1000000);
 const noise = new SimplexNoise(seed);
 
-// Tile property cache: { "x,y": { frame: N, humidity: ..., temp: ..., elevation: ..., tileType: ... } }
+// -- CACHE SYSTEM -- //
+// MOVE THIS TO CONSTANTS? XXX //
+// Tile property cache for performance
 const tileCache = {};
 let currentCacheFrame = 0;
 
-// Call this at the start of each frame or hour
+// Increment cache frame (call at start of each frame/hour)
 function incrementTileCacheFrame() {
     currentCacheFrame++;
 }
-
-// Helper to get a cache key
+// Helper: get cache key for a tile
 function getTileCacheKey(x, y) {
     return `${x},${y}`;
 }
 
-// Cached wrappers for tile property functions:
+// Cached wrappers for tile property functions
 function getCachedHumidity(x, y) {
     const key = getTileCacheKey(x, y);
     if (tileCache[key] && tileCache[key].frame === currentCacheFrame && tileCache[key].humidity !== undefined) {
@@ -120,6 +169,8 @@ function getCachedTileType(x, y) {
     return t;
 }
 
+//-- MAKE THE WORLD FEEL INFINITE -- //
+
 // Wrap x into [-5000, 5000]
 function wrapX(x) {
     let wrapped = ((x - WORLD_X_MIN) % WORLD_X_SIZE + WORLD_X_SIZE) % WORLD_X_SIZE + WORLD_X_MIN;
@@ -137,11 +188,13 @@ function getTileType(x, y) {
     const biome = getBiome(x, y);
     x = wrapX(x);
     y = wrapY(y);
-    //water first 
+
     // Rivers override other types
     if (riverTiles.has(`${x},${y}`)) {
         return "river";
     }
+
+    // -- XXX IS IT NEEDED? -- XXX //
 
     // Ocean at the world edge (last 50 tiles)
     if ((y >= -5000 && y <= -4950) || (y >= 4950 && y <= 5000) ||
@@ -149,47 +202,49 @@ function getTileType(x, y) {
         return "water";
     }
 
-    
+    //-- ELEVATION GENERATION --//
+
     //Elevation terrain types
     const elevation = getElevation(x, y);
-    if (biome === "tropical" && elevation < 120) {
-    const n = noise.noise2D(x * 0.2, y * 0.2) * 0.5 + 0.5;
-    if (n < 0.6) return "swamp"; // 30% swamp
-    if (n < 0.9) return "lake"; // 5% lake
-    // Otherwise, let it fall through to normal land
-}
-   // if (biome === "tropical" && elevation < 120 ) {
-        // Use noise for variety between swamp and lake
-        // 60% swamp, 40% lake
-     //   return "lake";
-   // }
+    
+    // BIOME SPECIFIC ELEVATION //
 
+    if (biome === "tropical" && elevation < 120) {
+    // In tropics, low elevation: swamp, wetland, or lake
+    const n = noise.noise2D(x * 0.2, y * 0.2) * 0.5 + 0.5; 
+    if (n < 0.4) return "swamp"; // 40% swamp
+    if (n < 0.7) return "wetland"; // 30% forest
+    if (n < 0.9) return "lake"; // 20% lake
+    // 10% non biome specific tiles
+}
+    // NOT IN BIOME //
+    
     if (elevation <= 50) {
-        // Sea level: water or beach
+        // Sea level
         return "water";
     }
 
     if (elevation > 50 && elevation <= 200) {
-        // Plains: flat, fertile land
+        // grass
         return "grass";
     }
 
     if (elevation > 200 && elevation <= 800) {
-        // Hills: rolling terrain, mixed forest, scattered trees
+        // Hills
         return "hill";
     }
 
     if (elevation > 800 && elevation <= 2500) {
-        // Mountains: steep, rugged, sparse trees, rocks
+        // Mountains
         return "mountain";
     }
 
     if (elevation > 2500 && elevation <= 4000) {
-        // High mountains: peak, often snow-capped, snow, bare rock, cold
+        // High mountains
         return "snow";
     }
     
-
+    // XXX IS THIS NEEDED? XXX //
     const key = `${x},${y}`;
     if (tileCache.has(key)) return tileCache.get(key);
 
@@ -210,6 +265,7 @@ function getTileType(x, y) {
     tileCache.set(key, type);
     return type;
 }
+// XXX MOVE THIS TO CONSTANTS? XXX //
 
 // Add a dry grass tile color if not present
 if (typeof tileColors !== "undefined" && !tileColors.dry) tileColors.dry = "#d1c97a"; // yellowish for dry grass
@@ -243,14 +299,14 @@ function updateDryGrass() {
             const x = wrapX(startX + dx);
             const y = wrapY(startY + dy);
             const key = `${x},${y}`;
-            // Use the original tile type for logic
+            // Mark as dry if grass and humidity is low
             if (
                 _originalGetTileType(x, y) === "grass" &&
                 getHumidity(x, y) <= 30
             ) {
                 dryGrassTiles.add(key);
             }
-            // Remove dry grass if humidity rises above 30 or tile is no longer grass
+            // Remove dry grass if humidity rises or not grass
             if (
                 dryGrassTiles.has(key) &&
                 (_originalGetTileType(x, y) !== "grass" || getHumidity(x, y) > 30)
@@ -274,6 +330,7 @@ function isNearType(x, y, type) {
     }
     return false;
 }
+// IS THIS NEEDED? XXX //  
 
 // Helper to check if a grass tile is adjacent to a forest tile
 function isNearForest(x, y) {
@@ -310,7 +367,7 @@ function hasLineOfSight(x0, y0, x1, y1) {
     }
     return true;
 }
-
+// Make this more generic //
 function isPlayerDeepInForest() {
     if (getTileType(player.x, player.y) !== "forest") return false;
     for (let dx = -1; dx <= 1; dx++) {
@@ -324,17 +381,22 @@ function isPlayerDeepInForest() {
     return true;
 }
 
-// Get the temperature at (x, y), from -50 (cold) to +50 (hot)
+// Get the temperature at (x, y)
 function getTemperature(x, y) {
     x = wrapX(x);
     y = wrapY(y);
+    
+    //  BIOME SPECIFIC TEMPERATURES //
 
-    // Tropical: constant, hot, minimal seasonality
+    // Tropical: constant, hot, minimal seasonality IS THIS A RANGE? XXX //
     if (getBiome(x, y) === "tropical") {
         const base = 27;
         const variation = (noise.noise2D(x * 0.1, y * 0.1) * 4); // ±4°C
         return Math.max(24, Math.min(32, base + variation));
     }
+    // IF NOT BIOME //
+
+    // MOVE THIS TO CONSTANTS? XXX //
 
     // Latitude: 0 at equator (y=0), 1 at poles (y=±5000)
     let latitudeNorm = Math.abs(y) / 5000; // 0 (equator) to 1 (pole)
@@ -342,15 +404,15 @@ function getTemperature(x, y) {
     // Base temperature: 50°C at equator, -50°C at poles
     let temp = Math.round(50 - 100 * latitudeNorm);
 
-    // --- Season modifier (now latitude-dependent) ---
+    // --- Season modifier 
     temp += getSeasonalTempAdjust(currentSeason, latitudeNorm);
 
-    // Add some local noise for variation
+    // Local noise 
     let nx = x * 0.03, ny = y * 0.03;
     let localNoise = noise.noise2D(nx + 300, ny - 300) * 0.5 + 0.5; // 0..1
     temp += Math.round((localNoise - 0.5) * 10); // ±5°C local variation
 
-    // Progressive mountain chill: colder the closer you are to mountains (radius 1 to 4)
+    // Mountain chill effect
     let mountainInfluence = 0;
     let maxRadius = 4;
     let totalWeight = 0;
@@ -379,14 +441,17 @@ function getTemperature(x, y) {
     temp += Math.round(mountainChill * 20); // up to -14°C if surrounded by mountains
 
     // Elevation adjustment: decrease temp by 0.65°C per 100m
+    /// MOVE THIS TO CONSTANTS? XXX ///
     const elevation = getElevation(x, y);
     temp -= 0.65 * (elevation / 100);
 
     // --- Day/Night Cycle: Apply night cooling by biome ---
+    // CHECK THIS FUNCTION //
     if (!isDay()) {
         const tileType = getTileType(x, y);
         temp -= getNightCoolingByBiome(tileType);
     }
+    // BIOME SPECIFIC TEMPERATURES .. TO REMOVE? XXX //
 
     // Boost temperature in tropics
     if (getBiome(x, y) === "tropical") {
@@ -397,7 +462,7 @@ function getTemperature(x, y) {
     if (getBiome(x, y) === "subtropical") {
         temp += 5; // hotter in subtropics
     }
-
+    // OKAY CAN KEEP THIS? XXX //
     if (getBiome(x, y) === "subpolar") {
         // Short, cool summers and cold winters
         if (currentSeason === "summer") temp += 4;
@@ -413,6 +478,8 @@ function getTemperature(x, y) {
 
     return temp;
 }
+
+// EXTRA TEMPERATURE REALLY? XXX //
 
 // Returns the seasonal temperature adjustment based on season and latitude
 function getSeasonalTempAdjust(season, latitudeNorm) {
@@ -438,7 +505,7 @@ function getHumidity(x, y) {
     x = wrapX(x);
     y = wrapY(y);
 
-    // Base humidity: higher near water, lower near poles, some noise
+    // Base humidity: Latitude + noise + water proximity
     let latitudeNorm = 1 - Math.abs(y) / 5000; // 1 at equator, 0 at poles
     let nx = x * 0.025, ny = y * 0.025;
     let noiseVal = noise.noise2D(nx + 500, ny - 500) * 0.5 + 0.5; // 0..1
@@ -472,7 +539,7 @@ function getHumidity(x, y) {
 
     // Map baseHumidity (0..100) into the allowed band
     let humidity = minH + (maxH - minH) * (baseHumidity / 100);
-
+    // MOVE THE CONSTANTS? XXX //
     // Elevation effect: higher elevation means lower humidity
     const elevation = getElevation(x, y);
     humidity -= elevation * 0.005; // 0.5% per 100m
@@ -497,20 +564,8 @@ function getHumidity(x, y) {
     }
     humidity += waterBonus;
 
-    // --- Vegetation cover modifier ---
-  //  const tileType = getTileType(x, y);
-  //  if (tileType === "forest") {
-        // Use noise for deterministic "randomness"
-   //     let n = noise.noise2D(x * 0.1 + 1234, y * 0.1 - 5678) * 0.5 + 0.5; // 0..1
-  //      humidity += 20 + n * 10; // +20–30%
- //   } else if (tileType === "grass" || tileType === "hill") {
-  //      let n = noise.noise2D(x * 0.1 + 4321, y * 0.1 - 8765) * 0.5 + 0.5;
-  //      humidity += 5 + n * 5; // +5–10%
-  //  } else if (tileType === "desert" || tileType === "bare" || tileType === "mountain" || tileType === "snow") {
-        // 0 bonus for bare/desert/mountain/snow
- //   }
-
     // --- Prevailing wind humidity bonus ---
+    // WIND EFFECT //
     humidity += getWindHumidityBonus(x, y);
 
     // --- Rain shadow effect ---
@@ -519,10 +574,10 @@ function getHumidity(x, y) {
     } else if (isWindwardOfMountain(x, y, 30)) {
         humidity += 20; // Extra moist on windward side
     }
-
+    // APPEAR TWICE XXX HERE AND //
     // Boost humidity in tropics
     if (getBiome(x, y) === "tropical") {
-        humidity += 20; // boost humidity in tropics
+        humidity = Math.max(80, humidity); // Tropical regions are very humid
     }
 
     // Adjust for subtropical regions
@@ -535,14 +590,14 @@ function getHumidity(x, y) {
         humidity -= 20; // Very dry
     }
     
-
+    //  XXX ... AND HERE//
     // Tropical: nearly saturated air, 85–100% humidity
     if (getBiome(x, y) === "tropical") {
         const base = 92;
         const variation = (noise.noise2D(x * 0.13, y * 0.13) * 8); // ±8%
         humidity = Math.max(85, Math.min(100, base + variation));
     }
-    // Increase humidity near rivers
+    // Increase humidity near rivers // MAKE IT A GENERALITY NEAR WATER? XXX //
     for (let dx = -3; dx <= 3; dx++) {
         for (let dy = -3; dy <= 3; dy++) {
             if (riverTiles.has(`${wrapX(x + dx)},${wrapY(y + dy)}`)) {
@@ -557,6 +612,7 @@ function getHumidity(x, y) {
 }
 
 // Prevailing wind direction: from ocean (west) to inland (east)
+// IS THIS EVER USED? XXX //
 // You can change this to "north", "south", or "east" for different climates
 const prevailingWind = "west";
 
@@ -575,6 +631,8 @@ function getPrevailingWindDirection(y) {
         return "east_to_west"; // Polar easterlies
     }
 }
+
+// WIND GIVE HUMIDITY BONUS FROM WHERE? XXX //
 
 // Helper to compute wind-based humidity bonus
 function getWindHumidityBonus(x, y) {
@@ -645,6 +703,23 @@ function getElevation(x, y) {
         return Math.floor(Math.random() * 30); // Always sea level (0-30m)
     }
 
+       // Tropical biome: custom elevation distribution
+    if (getBiome(x, y) === "tropical") {
+        // Use noise for elevation distribution
+        const n = noise.noise2D(x * 0.09, y * 0.09) * 0.5 + 0.5; // 0..1
+
+        if (n < 0.8) {
+            // 70–75% flatland (0–600m)
+            return Math.floor(n / 0.8 * 600);
+        } else if (n < 0.95) {
+            // 20% hills (600–1200m)
+            return 600 + Math.floor((n - 0.8) / 0.15 * 300);
+        } else {
+            // 5% mountains (1200–3000m)
+            return 900 + Math.floor((n - 0.95) / 0.05 * 2100);
+        }
+    }
+
     // Very low frequency, mostly plains/hills
     const nx = x * 0.012;
     const ny = y * 0.012;
@@ -660,7 +735,7 @@ function getElevation(x, y) {
     e = Math.min(1, Math.max(0, e));
     return Math.round(e * 4000);
 }
-
+// MOVE THIS TO CONSTANTS? XXX //
 const WORLD_Y_MIN = -5000;
 const WORLD_Y_MAX = 5000;
 const WORLD_Y_SIZE = WORLD_Y_MAX - WORLD_Y_MIN + 1;
@@ -778,6 +853,7 @@ function generateRiverPath(startX, startY, maxLength = 200) {
     return path;
 }
 
+// REMOVE THIS? XXX //
 // Lower elevation along river paths to create valleys
 function carveValleyAlongRiver(path) {
     for (let i = 0; i < path.length; i++) {
@@ -794,7 +870,7 @@ function carveValleyAlongRiver(path) {
         }
     }
 }
-
+//THIS TOO XXX //
 // Patch getElevation to include valley effect
 const originalGetElevation = getElevation;
 getElevation = function(x, y) {
@@ -830,19 +906,17 @@ function addRiver(startX, startY) {
     }
 }
 
-
+// MOVE THIS TO CONSTANTS? XXX //
 // Example: generate a few rivers at world generation
 // Random river count between 50 and 200
 const maxRivers = Math.floor(Math.random() * 151) + 50; // 50–200
 let riverCount = 0;
 const maxAttempts = 2000;
-
 for (let i = 0; i < maxAttempts && riverCount < maxRivers; i++) {
     let x = Math.floor(Math.random() * 9000) - 4500;
     let y = Math.floor(Math.random() * 9000) - 4500;
     const elevation = getElevation(x, y);
     const humidity = getHumidity(x, y);
-
     if (elevation > 1500) {
         // Climate-dependent river spacing
         if (humidity > 60 && !isNearRiver(x, y, 50 + Math.floor(Math.random() * 150))) {
@@ -861,7 +935,7 @@ for (let i = 0; i < maxAttempts && riverCount < maxRivers; i++) {
         // If humidity ≤ 10, no rivers (ephemeral or none)
     }
 }
-
+// Helper: is a tile near a river?
 function isNearRiver(x, y, minDist = 50) {
     for (let dx = -minDist; dx <= minDist; dx++) {
         for (let dy = -minDist; dy <= minDist; dy++) {
@@ -872,7 +946,7 @@ function isNearRiver(x, y, minDist = 50) {
     }
     return false;
 }
-
+// Night cooling by biome IMPACT ON TEMPERATURE //
 function getNightCoolingByBiome(tileType) {
     switch (tileType) {
         case "desert":
@@ -891,6 +965,7 @@ function getNightCoolingByBiome(tileType) {
     }
 }
 
+//HOW TEMPERATURE AFFECTS HUMIDITY? XXX //
 function getBaseHumidityFromTemp(temp) {
     if (temp < -10) {
         // Very cold: 0–10%
@@ -910,6 +985,7 @@ function getBaseHumidityFromTemp(temp) {
     }
 }
 
+// DISTANCE TO NEAREST WATER TILE //
 function distanceToNearestWater(x, y, maxDist = 400) {
     for (let r = 1; r <= maxDist; r++) {
         for (let dx = -r; dx <= r; dx++) {
@@ -926,7 +1002,7 @@ function distanceToNearestWater(x, y, maxDist = 400) {
     return maxDist + 1; // No water found within maxDist
 }
 
-// Call this for each tile to update rain/snow state
+// Update rain/snow/cloud state for a tile
 function updatePrecipitation(tile) {
     // Decrement rain_age if present
     if (tile.rain_age && tile.rain_age > 0) {
@@ -937,6 +1013,9 @@ function updatePrecipitation(tile) {
     }
     tile.snowing = false;
 
+    if (tile.raining) {
+    activeRainTiles.add(`${tile.x},${tile.y}`);
+}
     // Decrement rain_cooldown if present
     if (tile.rain_cooldown && tile.rain_cooldown > 0) {
         tile.rain_cooldown--;
@@ -954,7 +1033,7 @@ function updatePrecipitation(tile) {
 
         const biome = getBiome(tile.x, tile.y);
         if (biome === "tropical") {
-            chance *= 3; // Much more likely to rain in tropics
+            chance *= 0.3; // Much more likely to rain in tropics
         }
         if (biome === "temperate") {
             chance *= 1.2; // Slightly more rain in temperate
@@ -1047,7 +1126,7 @@ function updatePrecipitation(tile) {
         // In tropical biome, increase cloud cover frequency
         if (getBiome(tile.x, tile.y) === "tropical") {
             // 80% chance of cloud cover each day (frame)
-            const cloudChance = 0.8;
+            const cloudChance = 0.3;
             // Use deterministic noise for "random" but stable cloud cover
             const n = noise.noise2D(tile.x * 0.21 + currentCacheFrame * 0.01, tile.y * 0.21 - currentCacheFrame * 0.01) * 0.5 + 0.5;
             tile.cloud = n < cloudChance;
@@ -1057,7 +1136,15 @@ function updatePrecipitation(tile) {
     } else {
         tile.cloud = false;
     }
-
+    if (tile.cloud) {
+    activeCloudTiles.add(`${tile.x},${tile.y}`);
+    if (!tile.raining) {
+    activeRainTiles.delete(`${tile.x},${tile.y}`);
+}
+    if (!tile.cloud) {
+    activeCloudTiles.delete(`${tile.x},${tile.y}`);
+}
+}
     // Cloud spreads humidity downwind, but does not rain
     if (tile.cloud) {
         const windDir = getPrevailingWindDirection(tile.y);
@@ -1096,10 +1183,25 @@ function updatePrecipitation(tile) {
     if (!tile.raining && tile.rained_last_turn) {
         tile.rain_cooldown = 10; // 10 frames of cooldown before rain can restart
     }
+
+   // Track when humidity last dropped below 80 in tropical biome
+if (getBiome(tile.x, tile.y) === "tropical") {
+    if (tile.humidity < 80) {
+        // If not already tracking, set the day counter
+        if (!tile.humidityRestoreDay) {
+            tile.humidityRestoreDay = totalDay + 1; // restore next day
+        }
+    }
+    // If it's time to restore, set humidity back to 80
+    if (tile.humidityRestoreDay && totalDay >= tile.humidityRestoreDay) {
+        tile.humidity = 80;
+        tile.humidityRestoreDay = null;
+    }
 }
 
-// Tropical: -500 to +500 latitude
-// Update getBiome to add Subtropical biome
+}
+
+// Biome detection by latitude
 function getBiome(x, y) {
     if (y >= -500 && y <= 500) {
         return "tropical";
