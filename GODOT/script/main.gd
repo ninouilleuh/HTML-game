@@ -22,7 +22,7 @@ const WORLD_MAX = 5000
 
 var unloaded_pigs := {} # Key: chunk_coords, Value: Array of pig data (e.g., positions)
 const TILE_GRASS = 2 # Use your actual grass tile ID
-var pig_scene = preload("res://scenes/Pig.tscn")
+var pig_scene = preload("res://scenes/pig.tscn")
 var pigs = []
 
 func _ready():

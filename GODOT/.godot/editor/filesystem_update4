@@ -1,0 +1,6 @@
+res://scenes/main.tscn
+res://tiles/terrain_tileset.tres
+res://scenes/player.tscn
+res://scenes/InventorySlot.tscn
+res://scenes/pig.tscn
+res://script/main.gd
