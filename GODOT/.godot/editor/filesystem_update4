@@ -8,3 +8,4 @@ res://scenes/GameOverScreen.tscn
 res://scenes/Campfire.tscn
 res://script/main.gd
 res://script/map_generator.gd
+res://scenes/pig.gd
