@@ -123,10 +123,17 @@ func _process(delta):
 	# Use the width as the scaling reference (or use .y for height, or average both for diagonal)
 	var screen_scale = (get_viewport().size.x + get_viewport().size.y) / (1152.0 + 648.0)
 	var campfire_positions = []
+	var root = get_tree().root
+	var visible_rect = root.get_visible_rect()
+	var visible_origin = visible_rect.position
+	var visible_size = visible_rect.size
+
 	for campfire in get_tree().get_nodes_in_group("campfires"):
-		var offset = (campfire.global_position - camera.global_position) * camera.zoom * screen_scale
-		var screen_pos = offset + viewport_center
-		var uv = Vector2(screen_pos.x / get_viewport().size.x, screen_pos.y / get_viewport().size.y)
+		var screen_pos = (campfire.global_position - camera.global_position) * camera.zoom + (visible_size * 0.5) + visible_origin
+		var uv = Vector2(
+			screen_pos.x / visible_size.x,
+			screen_pos.y / visible_size.y
+		)
 		campfire_positions.append(uv)
 
 	var mat = overlay.material
