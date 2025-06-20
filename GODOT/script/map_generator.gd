@@ -188,15 +188,15 @@ func unload_chunk(chunk_coords: Vector2i):
 
 	# Remove pigs in this chunk
 	var main = get_tree().get_root().get_node("Main")
-	for pig in main.pigs.duplicate():
+	for pig in main.get_tree().get_nodes_in_group("pigs").duplicate():
 		var pig_tile = local_to_map(pig.position)
 		var pig_chunk = Vector2i(floor(pig_tile.x / chunk_size), floor(pig_tile.y / chunk_size))
 		if pig_chunk == chunk_coords:
-			# Make sure the chunk has a list to store pig positions
+			# Store and remove as before
 			if not main.unloaded_pigs.has(chunk_coords):
 				main.unloaded_pigs[chunk_coords] = []
-			# Now add the pig's position
 			main.unloaded_pigs[chunk_coords].append(pig.position)
+			pig.get_parent().remove_child(pig)
 			pig.queue_free()
 			main.pigs.erase(pig)
 
@@ -209,3 +209,8 @@ func unload_chunk(chunk_coords: Vector2i):
 				main.unloaded_campfires[chunk_coords] = []
 			main.unloaded_campfires[chunk_coords].append(campfire.position)
 			campfire.queue_free()
+
+	# After removing pigs, check if we need to spawn more
+	if main and main.has_method("spawn_pigs_on_grass"):
+		if main.pigs.size() < 10: # or whatever your minimum is
+			main.spawn_pigs_on_grass(10)

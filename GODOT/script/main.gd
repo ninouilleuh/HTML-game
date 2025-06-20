@@ -6,7 +6,8 @@ var time_of_day := 6.0 # Start at 6:00 (morning)
 var day := 1
 var inventory = {
 	"stick": 0,
-	"big_stick": 0
+	"big_stick": 0,
+	"campfire": 0
 }
 var slot_scene := preload("res://scenes/InventorySlot.tscn")
 var item_icons = {
