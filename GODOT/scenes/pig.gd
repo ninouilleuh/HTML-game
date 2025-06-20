@@ -255,6 +255,22 @@ func _process(delta):
 	# Night: wander (19h to 6h)
 	if (current_hour >= 19 or current_hour < 6) and not is_chasing and not is_searching and not is_afraid:
 		is_wandering = true
+
+		# Savior logic should only run at night while wandering
+		if not is_savior and is_wandering and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
+			for pig in get_tree().get_nodes_in_group("pigs"):
+				if pig == self or not pig.is_afraid:
+					continue
+				# Count current saviors for this pig
+				var savior_count = 0
+				for other in get_tree().get_nodes_in_group("pigs"):
+					if other.is_savior and other.savior_target == pig:
+						savior_count += 1
+				if savior_count < 3 and position.distance_to(pig.position) < tile_size * 64: # Big radius
+					is_savior = true
+					savior_target = pig
+					pig.is_being_saved = true
+					break
 	elif current_hour >= 6 and current_hour < 19:
 		is_wandering = false
 		velocity = Vector2.ZERO
