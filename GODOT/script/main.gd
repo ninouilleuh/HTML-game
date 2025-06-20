@@ -121,7 +121,7 @@ func _process(delta):
 	var camera = get_viewport().get_camera_2d()
 	var viewport_center = get_viewport().size * 0.5
 	# Use the width as the scaling reference (or use .y for height, or average both for diagonal)
-	var screen_scale =(get_viewport().size.x + get_viewport().size.y) / (1152.0 + 648.0) # 1152x648 is a 16:9 referencea
+	var screen_scale = get_viewport().size.x / 1152.0 # 1.0 at 1920px wide, >1.0 for larger screens
 	var campfire_positions = []
 	for campfire in get_tree().get_nodes_in_group("campfires"):
 		var offset = (campfire.global_position - camera.global_position) * camera.zoom * screen_scale
