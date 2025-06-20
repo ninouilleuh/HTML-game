@@ -262,8 +262,8 @@ func _process(delta):
 	if player and position.distance_to(player.position) < 20.0:
 		get_tree().get_root().get_node("Main").game_over()
 
-	# If not already a savior/scared and not in forest
-	if not is_savior and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
+	# If not already a savior/scared and not in forest and is wandering
+	if not is_savior and is_wandering and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
 		for pig in get_tree().get_nodes_in_group("pigs"):
 			if pig == self or not pig.is_afraid:
 				continue
