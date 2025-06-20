@@ -1,8 +1,8 @@
 extends TileMap
 
 
-@export var chunk_size := 32
-@export var render_distance := 3
+@export var chunk_size := 16
+@export var render_distance := 4
 
 const WORLD_MIN := -5000
 const WORLD_MAX := 5000
@@ -23,6 +23,7 @@ const TILE_WETLAND = 10
 var noise := FastNoiseLite.new()
 var generated_chunks := {}
 var active_chunks := {}
+
 
 func _ready():
 	noise.seed = randi()
@@ -51,9 +52,11 @@ func update_visible_chunks(player_pos: Vector2):
 			active_chunks.erase(chunk_coords)
 	
 	 # After updating chunks, spawn pigs if there are less than 10
-	var main = get_tree().get_root().get_node("Node2D") # or "Main" if that's your main node name
-	if main.pigs.size() < 20:
-		main.spawn_pigs_on_grass(10)
+	var main = get_tree().get_current_scene() # or "Main" if that's your main node name
+	if main and main.has_method("spawn_pigs_on_grass"):
+		if main.pigs.size() < 20:
+			main.spawn_pigs_on_grass(10)
+
 
 func generate_chunk(chunk_coords: Vector2i):
 	var start_x = chunk_coords.x * chunk_size
@@ -131,16 +134,25 @@ func generate_chunk(chunk_coords: Vector2i):
 	for pos in tile_map.keys():
 		set_cell(0, pos, tile_map[pos], Vector2i(0, 0), 0)
 	
-	var main = get_tree().get_root().get_node("Node2D") # Or "Main" if that's your node name
-	print("saved unloaded_pigs right before reload:", main.unloaded_pigs)
+	var main = get_tree().get_root().get_node("Main") # Or "Main" if that's your node name
 	if main.unloaded_pigs.has(chunk_coords):
 		for pig_pos in main.unloaded_pigs[chunk_coords]:
 			var pig = main.pig_scene.instantiate()
+			pig.name = "Pig"
 			pig.position = pig_pos
 			pig.chunk_coords = chunk_coords
 			main.add_child(pig)
 			main.pigs.append(pig)
 		main.unloaded_pigs.erase(chunk_coords)
+	
+	if main.unloaded_campfires.has(chunk_coords):
+		for campfire_pos in main.unloaded_campfires[chunk_coords]:
+			var campfire_scene = preload("res://scenes/Campfire.tscn")
+			var campfire = campfire_scene.instantiate()
+			campfire.position = campfire_pos
+			campfire.add_to_group("campfires")
+			main.add_child(campfire)
+		main.unloaded_campfires.erase(chunk_coords)
 
 # Helper function to flow river downhill
 func _generate_river_from(start_pos: Vector2i, elevation_map, tile_map):
@@ -172,18 +184,28 @@ func unload_chunk(chunk_coords: Vector2i):
 			if y < WORLD_MIN or y > WORLD_MAX:
 				continue
 			set_cell(0, Vector2i(x, y), -1) # -1 removes the tile
-		print("Unloading chunk:", chunk_coords)
-		# Remove pigs in this chunk
-		var main = get_tree().get_root().get_node("Node2D")
-		for pig in main.pigs.duplicate():
-			var pig_tile = local_to_map(pig.position)
-			var pig_chunk = Vector2i(floor(pig_tile.x / chunk_size), floor(pig_tile.y / chunk_size))
-			if pig_chunk == chunk_coords:
-				# Make sure the chunk has a list to store pig positions
-				if not main.unloaded_pigs.has(chunk_coords):
-					main.unloaded_pigs[chunk_coords] = []
-# Now add the pig's position (no need to check if it's already there, unless you want to prevent duplicates)
-				main.unloaded_pigs[chunk_coords].append(pig.position)
-				print("saved unloaded_pigs when unloading :", main.unloaded_pigs)
-				pig.queue_free()
-				main.pigs.erase(pig)
+
+
+	# Remove pigs in this chunk
+	var main = get_tree().get_root().get_node("Main")
+	for pig in main.pigs.duplicate():
+		var pig_tile = local_to_map(pig.position)
+		var pig_chunk = Vector2i(floor(pig_tile.x / chunk_size), floor(pig_tile.y / chunk_size))
+		if pig_chunk == chunk_coords:
+			# Make sure the chunk has a list to store pig positions
+			if not main.unloaded_pigs.has(chunk_coords):
+				main.unloaded_pigs[chunk_coords] = []
+			# Now add the pig's position
+			main.unloaded_pigs[chunk_coords].append(pig.position)
+			pig.queue_free()
+			main.pigs.erase(pig)
+
+	# Remove campfires in this chunk
+	for campfire in main.get_tree().get_nodes_in_group("campfires").duplicate():
+		var campfire_tile = local_to_map(campfire.position)
+		var campfire_chunk = Vector2i(floor(campfire_tile.x / chunk_size), floor(campfire_tile.y / chunk_size))
+		if campfire_chunk == chunk_coords:
+			if not main.unloaded_campfires.has(chunk_coords):
+				main.unloaded_campfires[chunk_coords] = []
+			main.unloaded_campfires[chunk_coords].append(campfire.position)
+			campfire.queue_free()
