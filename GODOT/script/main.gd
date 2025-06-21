@@ -7,13 +7,15 @@ var day := 1
 var inventory = {
 	"stick": 0,
 	"big_stick": 0,
-	"campfire": 0
+	"campfire": 0,
+	"wall": 0
 }
 var slot_scene := preload("res://scenes/InventorySlot.tscn")
 var item_icons = {
 	"stick": preload("res://assets/stick.png"),
 	"big_stick": preload("res://assets/big_stick.png"),
-	"campfire": preload("res://assets/campfire.png")
+	"campfire": preload("res://assets/campfire.png"),
+	"wall": preload("res://assets/wall.png")
 }
 
 const HOURS_PER_DAY := 24
@@ -21,6 +23,7 @@ const SECONDS_PER_HOUR := 60.0 # 1 hour = 1 minute real time
 const TILE_FOREST = 0 
 const WORLD_MIN = -5000
 const WORLD_MAX = 5000
+const TILE_WALL = 11 # Set this to the correct tile ID for your wall
 
 var unloaded_pigs := {} # Key: chunk_coords, Value: Array of pig data (e.g., positions)
 var unloaded_campfires := {} # Key: chunk_coords, Value: Array of campfire data (e.g., positions)
@@ -30,13 +33,18 @@ var pigs = []
 
 var recipes = {
 	"campfire": ["stick", "stick", "stick"],
-	"torch": ["stick", "coal"],
-	"wooden_spear": ["stick", "stone"]
+	"wall": ["big_stick"],# "big_stick", "big_stick", "big_stick", "big_stick"],
+	"big_stick": ["stick","stick","stick","stick","stick","stick"]
 }
 
 var is_placing := false
 var placing_item := ""
 var preview_sprite = null
+var selected_recipe_index := 0
+var selected_inventory_index := 0
+var ui_focus := "inventory" # or "crafting_book"
+
+var forest_harvest_counts := {} # Key: Vector2i(tile_pos), Value: int
 
 func _ready():
 	# Instance the player scene
@@ -104,19 +112,109 @@ func _process(delta):
 
 	$UI/HarvestButton.visible = (tile_type == TILE_FOREST)
 	
-	if is_placing and preview_sprite:
-		var mouse_pos = get_viewport().get_mouse_position()
-		var world_pos = get_global_mouse_position()
-		var tile = tilemap.local_to_map(world_pos)
-		var tile_center = tilemap.map_to_local(tile)
-		preview_sprite.position = tile_center
+#	if is_placing and preview_sprite:
+#		var mouse_pos = get_viewport().get_mouse_position()
+#		var world_pos = get_global_mouse_position()
+#		var tile = tilemap.local_to_map(world_pos)
+#		var tile_center = tilemap.map_to_local(tile)
+#		preview_sprite.position = tile_center
 	
-	if Input.is_action_just_pressed("action"):
+	if Input.is_action_just_pressed("action") and tile_type == TILE_FOREST and not $UI/CraftingBookWindow.visible :
 		_on_harvest_button_pressed()
 	if Input.is_action_just_pressed("inventory"):
 		_on_inventory_button_pressed()
 	if Input.is_action_just_pressed("build"):
 		_on_crafting_book_button_pressed()
+	if Input.is_action_just_pressed("place") and placing_item != "":
+		place_object_on_tile(placing_item, player_tile)
+		# Only stop placing if you run out of the item
+		if inventory[placing_item] <= 0:
+			is_placing = false
+			placing_item = ""
+			if preview_sprite:
+				preview_sprite.queue_free()
+				preview_sprite = null
+	if $UI/CraftingBookWindow.visible and not $UI/InventoryWindow.visible:
+		var recipe_names = recipes.keys()
+		if Input.is_action_just_pressed("ui_up"):
+			selected_recipe_index = max(0, selected_recipe_index - 1)
+			update_crafting_book()
+			
+		elif Input.is_action_just_pressed("ui_down"):
+			selected_recipe_index = min(recipe_names.size() - 1, selected_recipe_index + 1)
+			update_crafting_book()
+			
+		elif Input.is_action_just_pressed("action"):
+			var selected_recipe = recipe_names[selected_recipe_index]
+			if can_craft(selected_recipe):
+				craft_item(selected_recipe)
+				update_inventory_ui()
+				update_crafting_book()
+	if $UI/InventoryWindow.visible and not  $UI/CraftingBookWindow.visible :
+		var items = []
+		for item_name in inventory.keys():
+			if inventory[item_name] > 0:
+				items.append(item_name)
+		if Input.is_action_just_pressed("ui_right"):
+			selected_inventory_index = min(items.size() - 1, selected_inventory_index + 1)
+			update_inventory_ui()
+		elif Input.is_action_just_pressed("ui_left"):
+			selected_inventory_index = max(0, selected_inventory_index - 1)
+			update_inventory_ui()
+		elif Input.is_action_just_pressed("action"):
+			if items.size() > 0:
+				var item_name = items[selected_inventory_index]
+				if item_name == "campfire" or item_name == "wall":
+					is_placing = true
+					placing_item = item_name
+					$UI/InventoryWindow.visible = false
+	if $UI/InventoryWindow.visible and $UI/CraftingBookWindow.visible:
+		var items = []
+		for item_name in inventory.keys():
+			if inventory[item_name] > 0:
+				items.append(item_name)
+		var recipe_names = recipes.keys()
+
+		# Focus switching
+		if Input.is_action_just_pressed("ui_right") or Input.is_action_just_pressed("ui_left"):
+			ui_focus = "inventory"
+			update_inventory_ui()
+			update_crafting_book()
+		elif Input.is_action_just_pressed("ui_up") or Input.is_action_just_pressed("ui_down"):
+			ui_focus = "crafting_book"
+			update_inventory_ui()
+			update_crafting_book()
+
+		# Inventory navigation and selection
+		if ui_focus == "inventory":
+			if Input.is_action_just_pressed("ui_right"):
+				selected_inventory_index = min(items.size() - 1, selected_inventory_index + 1)
+				update_inventory_ui()
+			elif Input.is_action_just_pressed("ui_left"):
+				selected_inventory_index = max(0, selected_inventory_index - 1)
+				update_inventory_ui()
+			elif Input.is_action_just_pressed("action"):
+				if items.size() > 0:
+					var item_name = items[selected_inventory_index]
+					if item_name == "campfire" or item_name == "wall":
+						is_placing = true
+						placing_item = item_name
+						$UI/InventoryWindow.visible = false
+
+		# Crafting book navigation and selection
+		elif ui_focus == "crafting_book":
+			if Input.is_action_just_pressed("ui_up"):
+				selected_recipe_index = max(0, selected_recipe_index - 1)
+				update_crafting_book()
+			elif Input.is_action_just_pressed("ui_down"):
+				selected_recipe_index = min(recipe_names.size() - 1, selected_recipe_index + 1)
+				update_crafting_book()
+			elif Input.is_action_just_pressed("action"):
+				var selected_recipe = recipe_names[selected_recipe_index]
+				if can_craft(selected_recipe):
+					craft_item(selected_recipe)
+					update_inventory_ui()
+					update_crafting_book()
 	
 	 # Gather campfire positions in screen UV (0-1) coordinates
 	var camera = get_viewport().get_camera_2d()
@@ -146,20 +244,20 @@ func _process(delta):
 		mat.set_shader_parameter("radius", 160.0 * screen_scale)      # <-- Add this
 		mat.set_shader_parameter("softness", 48.0 * screen_scale)     # <-- And this
 	
-func _input(event):
-	if is_placing and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		print("clicked!")
-		var tilemap = $NavigationRegion2D/TileMap
-		var mouse_pos = get_viewport().get_mouse_position()
-		var world_pos = get_global_mouse_position()
-		var tile = tilemap.local_to_map(world_pos)
-		# Place the campfire (e.g., set a tile, spawn a campfire node, etc.)
-		place_object_on_tile(placing_item, tile)
-		is_placing = false
-		placing_item = ""
-		if preview_sprite:
-			preview_sprite.queue_free()
-			preview_sprite = null
+#func _input(event):
+#	if is_placing and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+#		print("clicked!")
+#		var tilemap = $NavigationRegion2D/TileMap
+#		var mouse_pos = get_viewport().get_mouse_position()
+#		var world_pos = get_global_mouse_position()
+#		var tile = tilemap.local_to_map(world_pos)
+#		# Place the campfire (e.g., set a tile, spawn a campfire node, etc.)
+#		place_object_on_tile(placing_item, tile)
+#		is_placing = false
+#		placing_item = ""
+#		if preview_sprite:
+#			preview_sprite.queue_free()
+#			preview_sprite = null
 
 func place_object_on_tile(item_name, tile):
 	var tilemap = $NavigationRegion2D/TileMap
@@ -171,8 +269,26 @@ func place_object_on_tile(item_name, tile):
 		add_child(campfire)
 		inventory[item_name] -= 1
 		update_inventory_ui()
+	elif item_name == "wall":
+		var wall_tile_id = TILE_WALL
+		tilemap.set_cell(0, tile, wall_tile_id, Vector2i(0, 0), 0)
+		tilemap.queue_redraw() # Request redraw (Godot 4)
+		$NavigationRegion2D.bake_navigation_polygon()
+		print(tile, TILE_WALL)
+		print("Placing wall at tile:", tile, "with ID:", TILE_WALL)
+		print("TileSet has tile for ID 3:", tilemap.tile_set.get_source(TILE_WALL) != null)
+		inventory[item_name] -= 1
+		update_inventory_ui()
 
 func _on_harvest_button_pressed() -> void:
+	var tilemap = $NavigationRegion2D/TileMap
+	var player_tile = tilemap.local_to_map(player.position)
+	
+	# Track harvest count for this tile
+	if not forest_harvest_counts.has(player_tile):
+		forest_harvest_counts[player_tile] = 0
+	forest_harvest_counts[player_tile] += 1
+
 	var rand = randi() % 100
 	if rand < 80:
 		inventory["stick"] += 1
@@ -180,6 +296,31 @@ func _on_harvest_button_pressed() -> void:
 	else:
 		inventory["big_stick"] += 1
 		print("You found a big stick! Total big sticks: %d" % inventory["big_stick"])
+
+	# If harvested more than 5 times, change the tile to the most common neighbor (except forest)
+	if forest_harvest_counts[player_tile] > 4: #5 harvest max
+		var neighbor_counts = {}
+		var radius = 1
+		for dx in range(-radius, radius + 1):
+			for dy in range(-radius, radius + 1):
+				if dx == 0 and dy == 0:
+					continue
+				var neighbor_tile = player_tile + Vector2i(dx, dy)
+				var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
+				if neighbor_type != TILE_FOREST:
+					neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
+
+		var new_tile = TILE_GRASS
+		var max_count = 0
+		for tile_type in neighbor_counts.keys():
+			if neighbor_counts[tile_type] > max_count:
+				max_count = neighbor_counts[tile_type]
+				new_tile = tile_type
+
+		tilemap.set_cell(0, player_tile, new_tile, Vector2i(0, 0), 0)
+		print("The forest has been depleted and turned into tile ID %d!" % new_tile)
+		forest_harvest_counts.erase(player_tile) # Optional: stop tracking
+
 	update_inventory_ui()
 	update_crafting_book()
 
@@ -205,16 +346,28 @@ func update_inventory_ui():
 			texture_rect.texture = item_icons.get(item_name, null)
 			label.text = "%d" % [inventory[item_name]]
 			invname.text = "%s" % [item_name.capitalize()]
-			texture_rect.modulate = Color(1, 1, 1, 1) # full brightness
+
+			# Highlight only if inventory is focused
+			var is_selected = i == selected_inventory_index and (
+				($UI/InventoryWindow.visible and not $UI/CraftingBookWindow.visible) or
+				($UI/InventoryWindow.visible and $UI/CraftingBookWindow.visible and ui_focus == "inventory")
+			)
+			if is_selected:
+				var style = StyleBoxFlat.new()
+				style.bg_color = Color(1, 1, 1, 0.7) # White with some transparency
+				slot.add_theme_stylebox_override("panel", style)
+				texture_rect.modulate = Color(1, 1, 1, 0.7) # White overlay on image
+			else:
+				slot.add_theme_stylebox_override("panel", null) # Reset to default
+				texture_rect.modulate = Color(1, 1, 1, 1) # Normal image
 
 			# Only connect for placeable items
-			if item_name == "campfire":
+			if item_name == "campfire" or item_name == "wall":
 				texture_rect.gui_input.connect(func(event):
 					if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 						is_placing = true
 						placing_item = item_name
 						$UI/InventoryWindow.visible = false
-						show_placement_preview(item_name)
 				)
 		else:
 			texture_rect.texture = null
@@ -224,9 +377,6 @@ func update_inventory_ui():
 		slot_container.add_child(slot)
 func _on_inventory_button_pressed() -> void:
 	$UI/InventoryWindow.visible = not $UI/InventoryWindow.visible
-	if $UI/InventoryWindow.visible:
-		update_inventory_ui()
-
 func show_placement_preview(item_name):
 	if preview_sprite:
 		preview_sprite.queue_free()
@@ -275,7 +425,8 @@ func spawn_pigs_on_grass(count: int):
 		tries += 1
 
 func game_over():
-	get_tree().paused = false  # Just in case
+	get_tree().paused = false  # Pause the game
+	self.hide() # Optionally hide the main node to prevent further processing
 	var game_over_scene = load("res://scenes/GameOverScreen.tscn").instantiate()
 	get_tree().get_root().add_child(game_over_scene)
 
@@ -283,29 +434,77 @@ func game_over():
 func _on_crafting_book_button_pressed() -> void:
 	$UI/CraftingBookWindow.visible = not $UI/CraftingBookWindow.visible
 	if $UI/CraftingBookWindow.visible:
+		selected_recipe_index = 0
 		update_crafting_book()
+	
 
 func update_crafting_book():
 	var recipe_list = $UI/CraftingBookWindow/RecipeList
 	for child in recipe_list.get_children():
 		child.queue_free()
 
-	for recipe_name in recipes.keys():
+	var recipe_names = recipes.keys()
+	for i in range(recipe_names.size()):
+		var recipe_name = recipe_names[i]
 		var can_make = can_craft(recipe_name)
+		
+		# Create a horizontal container for icon + label
+		var hbox = HBoxContainer.new()
+		hbox.custom_minimum_size = Vector2(200, 68)
+
+		# Icon
 		var icon = TextureRect.new()
 		icon.texture = item_icons.get(recipe_name, null)
 		icon.expand = true
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.modulate = Color(1,1,1,1) if can_make else Color(0.5,0.5,0.5,1)
-		icon.custom_minimum_size = Vector2(64, 64) # Set custom minimum size
-		# Tooltip text
+		icon.custom_minimum_size = Vector2(64, 64)
+
+		# Tooltip text and ingredient label
 		var ingredient_counts = {}
 		for item in recipes[recipe_name]:
 			ingredient_counts[item] = ingredient_counts.get(item, 0) + 1
 		var tooltip = ""
 		for item in ingredient_counts.keys():
 			tooltip += "%s x%d\n" % [item.capitalize(), ingredient_counts[item]]
-		icon.tooltip_text = tooltip.strip_edges()
+
+		# Highlight border
+		var panel = PanelContainer.new()
+		panel.custom_minimum_size = Vector2(68, 68)
+		var style = StyleBoxFlat.new()
+		if i == selected_recipe_index and (
+			($UI/CraftingBookWindow.visible and not $UI/InventoryWindow.visible) or
+			($UI/InventoryWindow.visible and $UI/CraftingBookWindow.visible and ui_focus == "crafting_book")
+		):
+			style.border_width_left = 3
+			style.border_width_top = 3
+			style.border_width_right = 3
+			style.border_width_bottom = 3
+			style.border_color = Color.WHITE
+			style.bg_color = Color(0,0,0,0)
+		else:
+			style.border_width_left = 0
+			style.border_width_top = 0
+			style.border_width_right = 0
+			style.border_width_bottom = 0
+			style.bg_color = Color(0,0,0,0)
+		var theme = Theme.new()
+		theme.set_stylebox("panel", "PanelContainer", style)
+		panel.theme = theme
+		panel.add_child(icon)
+
+		# Add icon to hbox
+		hbox.add_child(panel)
+
+		# Only show ingredient label for the selected recipe
+		if i == selected_recipe_index:
+			var ingredient_label = Label.new()
+			ingredient_label.text = tooltip.strip_edges()
+			ingredient_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			ingredient_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			ingredient_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			hbox.add_child(ingredient_label)
+
 		# Click to craft if possible
 		if can_make:
 			icon.gui_input.connect(func(event):
@@ -314,8 +513,7 @@ func update_crafting_book():
 					update_inventory_ui()
 					update_crafting_book()
 			)
-		recipe_list.add_child(icon)
-
+		recipe_list.add_child(hbox)
 func can_craft(recipe_name):
 	var needed = recipes[recipe_name].duplicate()
 	var inv = inventory.duplicate()

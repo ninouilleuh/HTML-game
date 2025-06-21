@@ -1,6 +1,7 @@
 extends Node2D
 
 const TILE_MOUNTAIN = 5 
+const TILE_WALL = 11
 @export var move_speed := 900  # Pixels per second
 var tile_size := 64
 var moving := false
@@ -28,12 +29,21 @@ func _process(delta):
 		if input_vector != Vector2.ZERO:
 			input_vector = input_vector.normalized()
 			var move_delta = Vector2i(round(input_vector.x), round(input_vector.y))
-			if move_delta != Vector2i.ZERO:
+			if tilemap and move_delta != Vector2i.ZERO:
 				var current_tile = tilemap.local_to_map(position)
 				var target_tile = current_tile + move_delta
 				var tile_type = tilemap.get_cell_source_id(0, target_tile)
-				if tile_type != TILE_MOUNTAIN:
-					move_target = tilemap.map_to_local(target_tile)
+				var target_pos = tilemap.map_to_local(target_tile)
+				
+				# Check for wall at target position
+				var wall_blocked = false
+				for wall in get_tree().get_nodes_in_group("walls"):
+					if wall.position.distance_to(target_pos) < tile_size * 0.5:
+						wall_blocked = true
+						break
+
+				if tile_type != TILE_MOUNTAIN and tile_type != TILE_WALL:
+					move_target = target_pos
 					moving = true
 	else:
 		var direction = (move_target - position).normalized()

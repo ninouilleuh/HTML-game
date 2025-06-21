@@ -236,8 +236,6 @@ func _process(delta):
 								if wall.global_position.distance_to(check_pos) < tile_size * 0.4:
 									valid = false
 									break
-							if not valid:
-								break
 						# Also check the destination tile
 						var dest_pos = position + dir * speed * WANDER_DURATION * 0.3
 						var dest_tile = tilemap.local_to_map(dest_pos)
@@ -271,7 +269,7 @@ func _process(delta):
 		is_wandering = true
 
 		# Savior logic should only run at night while wandering
-		if not is_savior and is_wandering and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
+		if main and not is_savior and is_wandering and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
 			for pig in get_tree().get_nodes_in_group("pigs"):
 				if pig == self or not pig.is_afraid:
 					continue
@@ -293,23 +291,23 @@ func _process(delta):
 	if player and position.distance_to(player.position) < 20.0:
 		get_tree().get_root().get_node("Main").game_over()
 
-	# If not already a savior/scared and not in forest and is wandering
-	if not is_savior and is_wandering and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
-		for pig in get_tree().get_nodes_in_group("pigs"):
-			if pig == self or not pig.is_afraid:
-				continue
+	if main :# If not already a savior/scared and not in forest and is wandering
+		if not is_savior and is_wandering and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
+			for pig in get_tree().get_nodes_in_group("pigs"):
+				if pig == self or not pig.is_afraid:
+					continue
 			# Count current saviors for this pig
-			var savior_count = 0
-			for other in get_tree().get_nodes_in_group("pigs"):
-				if other.is_savior and other.savior_target == pig:
-					savior_count += 1
-			if savior_count < 3 and position.distance_to(pig.position) < tile_size * 64: # Big radius
+				var savior_count = 0
+				for other in get_tree().get_nodes_in_group("pigs"):
+					if other.is_savior and other.savior_target == pig:
+						savior_count += 1
+				if savior_count < 3 and position.distance_to(pig.position) < tile_size * 64: # Big radius
 	
-				is_savior = true
-				savior_target = pig
-				pig.is_being_saved = true
-				$CollisionShape2D.disabled = true # <-- Désactive la collision
-				break
+					is_savior = true
+					savior_target = pig
+					pig.is_being_saved = true
+					$CollisionShape2D.disabled = true # <-- Désactive la collision
+					break
 	if is_savior and not is_waiting_for_saviors:
 		if not is_instance_valid(savior_target):
 			is_savior = false
@@ -336,12 +334,21 @@ func _process(delta):
 			if savior_timer > 1.0:
 				# Each savior and the rescued pig picks a random nearby non-forest tile
 				for pig in savior_group:
+					if not is_instance_valid(pig):
+						continue
 					var found = false
 					var tries = 0
 					while not found and tries < 30:
 						var offset = Vector2i(randi_range(-8, 8), randi_range(-8, 8))
 						var check_tile = tilemap.local_to_map(pig.position) + offset
-						if tilemap.get_cell_source_id(0, check_tile) != forest_tile_id:
+						var is_forest = tilemap.get_cell_source_id(0, check_tile) == forest_tile_id
+						var is_wall = false
+						var check_pos = tilemap.map_to_local(check_tile)
+						for wall in get_tree().get_nodes_in_group("walls"):
+							if wall.global_position.distance_to(check_pos) < tile_size * 0.4:
+								is_wall = true
+								break
+						if not is_forest and not is_wall:
 							found = true
 							var safe_pos = tilemap.map_to_local(check_tile)
 							pig.is_waiting_for_saviors = false
@@ -356,11 +363,11 @@ func _process(delta):
 
 				# Do the same for the rescued pig
 				var rescued = savior_target
-				var found = false
-				var tries = 0
-				while not found and tries < 30:
-					var offset = Vector2i(randi_range(-8, 8), randi_range(-8, 8))
-					if rescued :
+				if is_instance_valid(rescued):
+					var found = false
+					var tries = 0
+					while not found and tries < 30:
+						var offset = Vector2i(randi_range(-8, 8), randi_range(-8, 8))
 						var check_tile = tilemap.local_to_map(rescued.position) + offset
 						if tilemap.get_cell_source_id(0, check_tile) != forest_tile_id:
 							found = true
@@ -371,7 +378,7 @@ func _process(delta):
 							rescued.wander_dir = (safe_pos - rescued.position).normalized()
 							rescued.wander_timer = WANDER_DURATION
 							rescued.wander_pause_timer = 0.0
-							rescued.get_node("CollisionShape2D").disabled = false # <-- Réactive la collision
+							rescued.get_node("CollisionShape2D").disabled = false
 						tries += 1
 	if is_crossing_forest:
 		if not is_instance_valid(savior_target):
