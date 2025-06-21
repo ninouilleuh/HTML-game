@@ -41,7 +41,6 @@ shader_parameter/viewport_size = Vector2(0, 0)
 script = ExtResource("1_jyhfs")
 
 [node name="UI" type="CanvasLayer" parent="."]
-layer = 2
 
 [node name="TimePanel" type="Panel" parent="UI"]
 anchors_preset = 1
@@ -215,10 +214,6 @@ navigation_polygon = SubResource("NavigationPolygon_sugp2")
 tile_set = ExtResource("1_o5qli")
 format = 2
 script = ExtResource("2_0wfyh")
-
-[node name="FogTileMap" type="TileMap" parent="NavigationRegion2D"]
-tile_set = ExtResource("1_o5qli")
-format = 2
 
 [connection signal="pressed" from="UI/HarvestButton" to="." method="_on_harvest_button_pressed"]
 [connection signal="pressed" from="UI/InventoryButton" to="." method="_on_inventory_button_pressed"]

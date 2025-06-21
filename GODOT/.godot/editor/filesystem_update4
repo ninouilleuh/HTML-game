@@ -8,3 +8,5 @@ res://scenes/pig.tscn
 res://scenes/GameOverScreen.tscn
 res://scenes/Campfire.tscn
 res://scenes/wall.tscn
+res://scenes/fog.gdshader
+res://script/map_generator.gd

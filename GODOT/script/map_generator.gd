@@ -18,6 +18,7 @@ const TILE_SNOW = 7
 const TILE_SWAMP = 8
 const TILE_WATER = 9
 const TILE_WETLAND = 10
+const FOG_TILE_ID = 1 # Add your fog tile ID here
 
 
 var noise := FastNoiseLite.new()
@@ -133,6 +134,10 @@ func generate_chunk(chunk_coords: Vector2i):
 	# 4. Set tiles in the TileMap
 	for pos in tile_map.keys():
 		set_cell(0, pos, tile_map[pos], Vector2i(0, 0), 0)
+		# Place fog tile
+		var main = get_tree().get_root().get_node("Main")
+		var fog_tilemap = main.get_node("NavigationRegion2D/FogTileMap")
+		fog_tilemap.set_cell(0, pos, 1, Vector2i(0, 0), 0) # 1 = your fog tile ID
 	
 	var main = get_tree().get_root().get_node("Main") # Or "Main" if that's your node name
 	if main.unloaded_pigs.has(chunk_coords):
@@ -178,12 +183,13 @@ func unload_chunk(chunk_coords: Vector2i):
 	var start_x = chunk_coords.x * chunk_size
 	var start_y = chunk_coords.y * chunk_size
 	for x in range(start_x, start_x + chunk_size):
-		if x < WORLD_MIN or x > WORLD_MAX:
-			continue
 		for y in range(start_y, start_y + chunk_size):
-			if y < WORLD_MIN or y > WORLD_MAX:
+			if x < WORLD_MIN or x > WORLD_MAX or y < WORLD_MIN or y > WORLD_MAX:
 				continue
-			set_cell(0, Vector2i(x, y), -1) # -1 removes the tile
+			set_cell(0, Vector2i(x, y), -1) # Remove terrain tile
+			var main = get_tree().get_root().get_node("Main")
+			var fog_tilemap = main.get_node("NavigationRegion2D/FogTileMap")
+			fog_tilemap.set_cell(0, Vector2i(x, y), -1) # Remove fog tile
 
 
 	# Remove pigs in this chunk

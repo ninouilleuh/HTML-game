@@ -1,14 +1,15 @@
+TileMap
+CanvasLayer
+ColorRect
 Label
 NavigationObstacle2D
 CollisionShape2D
 StaticBody2D
 Sprite2D
 Node2D
-CanvasLayer
 PointLight2D
 VBoxContainer
 Panel
 Button
 CharacterBody2D
-ColorRect
 Control

@@ -2,7 +2,7 @@ extends Node2D
 
 var player
 
-var time_of_day := 6.0 # Start at 6:00 (morning)
+var time_of_day := 6.00 # Start at 6:00 (morning)
 var day := 1
 var inventory = {
 	"stick": 0,
@@ -24,7 +24,7 @@ const TILE_FOREST = 0
 const WORLD_MIN = -5000
 const WORLD_MAX = 5000
 const TILE_WALL = 11 # Set this to the correct tile ID for your wall
-
+const TILE_MOUNTAIN = 5
 var unloaded_pigs := {} # Key: chunk_coords, Value: Array of pig data (e.g., positions)
 var unloaded_campfires := {} # Key: chunk_coords, Value: Array of campfire data (e.g., positions)
 const TILE_GRASS = 2 # Use your actual grass tile ID
@@ -62,6 +62,9 @@ func _ready():
 	# Generate initial chunks around the player
 	tilemap.update_visible_chunks(player.position)
 	spawn_pigs_on_grass(20)
+	
+	var fog_tilemap = $NavigationRegion2D/FogTileMap
+	
 
 func _process(delta):
 	# Advance time
@@ -84,7 +87,8 @@ func _process(delta):
 	var tilemap = $NavigationRegion2D/TileMap
 	var player_tile = tilemap.local_to_map(player.position)
 	var tile_type = tilemap.get_cell_source_id(0, player_tile)
-
+	if player :
+		update_fog_of_war()
 	# fade to dark at night (between 18:00 and 6:00)
 	var overlay = $CanvasLayer/DayNightOverlay
 	var night_strength = 0
@@ -243,6 +247,7 @@ func _process(delta):
 		mat.set_shader_parameter("overlay_color", overlay.color)
 		mat.set_shader_parameter("radius", 160.0 * screen_scale)      # <-- Add this
 		mat.set_shader_parameter("softness", 48.0 * screen_scale)     # <-- And this
+	
 	
 #func _input(event):
 #	if is_placing and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -540,3 +545,54 @@ func craft_item(recipe_name):
 	if not inventory.has(recipe_name):
 		inventory[recipe_name] = 0
 	inventory[recipe_name] += 1
+
+func compute_fov(tilemap: TileMap, origin: Vector2i, radius: int, is_blocker: Callable) -> Dictionary:
+	var visible := {}
+	visible[origin] = true
+	for angle in range(0, 360, 1): # Use 1-degree steps for better coverage
+		var rad = deg_to_rad(angle)
+		var dx = cos(rad)
+		var dy = sin(rad)
+		for r in range(1, radius + 1):
+			var pos = origin + Vector2i(round(dx * r), round(dy * r))
+			if visible.has(pos):
+				continue # Already checked this tile
+			visible[pos] = true
+			if is_blocker(tilemap, pos):
+				break
+	return visible
+func update_fog_of_war():
+	var tilemap = $NavigationRegion2D/TileMap
+	var fog_tilemap = $NavigationRegion2D/FogTileMap
+	var player_tile = tilemap.local_to_map(player.position)
+	var fov_tiles = compute_fov(tilemap, player_tile, 32.9, is_blocker)
+
+
+	# 1. Cover all loaded chunk tiles with fog
+	for chunk_coords in tilemap.active_chunks.keys():
+		var start_x = chunk_coords.x * tilemap.chunk_size
+		var start_y = chunk_coords.y * tilemap.chunk_size
+		for x in range(start_x, start_x + tilemap.chunk_size):
+			for y in range(start_y, start_y + tilemap.chunk_size):
+				fog_tilemap.set_cell(0, Vector2i(x, y), 1, Vector2i(0, 0), 0)
+
+	# 2. Remove fog for visible tiles
+	for pos in fov_tiles.keys():
+		fog_tilemap.set_cell(0, pos, -1) # -1 removes the fog tile
+	
+	 # 3. Remove fog around each campfire
+	var campfire_radius = 8 # Adjust as needed
+	for campfire in get_tree().get_nodes_in_group("campfires"):
+		var campfire_tile = tilemap.local_to_map(campfire.position)
+		var olive_radius_x = 12 # horizontal radius (wider)
+		var olive_radius_y = 6  # vertical radius (narrower)
+		for dx in range(-olive_radius_x, olive_radius_x + 1):
+			for dy in range(-olive_radius_y, olive_radius_y + 1):
+				# Ellipse equation: (x/a)^2 + (y/b)^2 <= 1
+				if (pow(dx / float(olive_radius_x), 2) + pow(dy / float(olive_radius_y), 2)) <= 1.0:
+					var pos = campfire_tile + Vector2i(dx, dy)
+					fog_tilemap.set_cell(0, pos, -1)
+
+func is_blocker(tilemap, pos):
+	var tile_type = tilemap.get_cell_source_id(0, pos)
+	return tile_type == TILE_FOREST or tile_type == TILE_MOUNTAIN
