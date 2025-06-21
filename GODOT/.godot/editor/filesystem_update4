@@ -10,3 +10,5 @@ res://scenes/Campfire.tscn
 res://scenes/wall.tscn
 res://scenes/fog.gdshader
 res://script/map_generator.gd
+res://scenes/goat.tscn
+res://scenes/goat.gd

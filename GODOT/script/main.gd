@@ -45,7 +45,8 @@ var selected_inventory_index := 0
 var ui_focus := "inventory" # or "crafting_book"
 
 var forest_harvest_counts := {} # Key: Vector2i(tile_pos), Value: int
-
+var goat_scene = preload("res://scenes/goat.tscn")
+var goats = []
 func _ready():
 	# Instance the player scene
 	var player_scene = preload("res://scenes/player.tscn")
@@ -62,8 +63,10 @@ func _ready():
 	# Generate initial chunks around the player
 	tilemap.update_visible_chunks(player.position)
 	spawn_pigs_on_grass(20)
-	
+	spawn_goats_on_mountains(10)
 	var fog_tilemap = $NavigationRegion2D/FogTileMap
+	
+	
 	
 
 func _process(delta):
@@ -434,6 +437,29 @@ func spawn_pigs_on_grass(count: int):
 			pig.position = tilemap.map_to_local(tile_pos)
 			add_child(pig)
 			pigs.append(pig)
+			spawned += 1
+		tries += 1
+
+func spawn_goats_on_mountains(count: int):
+	var tilemap = $NavigationRegion2D/TileMap
+	var spawned = 0
+	var tries = 0
+	var chunk_size = tilemap.chunk_size
+	var loaded_chunks = tilemap.active_chunks.keys()
+	while spawned < count and tries < count * 50:
+		var chunk_coords = loaded_chunks[randi() % loaded_chunks.size()]
+		var start_x = chunk_coords.x * chunk_size
+		var start_y = chunk_coords.y * chunk_size
+		var x = start_x + randi() % chunk_size
+		var y = start_y + randi() % chunk_size
+		var tile_pos = Vector2i(x, y)
+		var tile_type = tilemap.get_cell_source_id(0, tile_pos)
+		if tile_type == TILE_MOUNTAIN:
+			var goat = goat_scene.instantiate()
+			goat.position = tilemap.map_to_local(tile_pos)
+			goat.add_to_group("goats")
+			add_child(goat)
+			goats.append(goat)
 			spawned += 1
 		tries += 1
 
