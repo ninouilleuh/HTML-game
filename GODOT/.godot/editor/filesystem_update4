@@ -2,3 +2,9 @@ res://scenes/InventorySlot.tscn
 res://tiles/terrain_tileset.tres
 res://scenes/campfire.gdshader
 res://script/main.gd
+res://scenes/main.tscn
+res://scenes/player.tscn
+res://scenes/pig.tscn
+res://scenes/GameOverScreen.tscn
+res://scenes/Campfire.tscn
+res://scenes/wall.tscn

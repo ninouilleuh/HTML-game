@@ -298,25 +298,33 @@ func _on_harvest_button_pressed() -> void:
 		print("You found a big stick! Total big sticks: %d" % inventory["big_stick"])
 
 	# If harvested more than 5 times, change the tile to the most common neighbor (except forest)
-	if forest_harvest_counts[player_tile] > 4: #5 harvest max
+	if forest_harvest_counts[player_tile] > 4: # 5 harvest max
+		var max_radius = 20 # You can set this to the number of tiles that covers your screen
+		var found = false
 		var neighbor_counts = {}
-		var radius = 1
-		for dx in range(-radius, radius + 1):
-			for dy in range(-radius, radius + 1):
-				if dx == 0 and dy == 0:
-					continue
-				var neighbor_tile = player_tile + Vector2i(dx, dy)
-				var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
-				if neighbor_type != TILE_FOREST:
-					neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
-
 		var new_tile = TILE_GRASS
-		var max_count = 0
-		for tile_type in neighbor_counts.keys():
-			if neighbor_counts[tile_type] > max_count:
-				max_count = neighbor_counts[tile_type]
-				new_tile = tile_type
 
+		for radius in range(1, max_radius + 1):
+			neighbor_counts.clear()
+			for dx in range(-radius, radius + 1):
+				for dy in range(-radius, radius + 1):
+					if dx == 0 and dy == 0:
+						continue
+					var neighbor_tile = player_tile + Vector2i(dx, dy)
+					var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
+					if neighbor_type != TILE_FOREST and neighbor_type != TILE_WALL:
+						neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
+			if neighbor_counts.size() > 0:
+				# Found at least one non-forest tile in this radius
+				var max_count = 0
+				for tile_type in neighbor_counts.keys():
+					if neighbor_counts[tile_type] > max_count:
+						max_count = neighbor_counts[tile_type]
+						new_tile = tile_type
+				found = true
+				break
+
+		# If nothing found after searching, default to grass
 		tilemap.set_cell(0, player_tile, new_tile, Vector2i(0, 0), 0)
 		print("The forest has been depleted and turned into tile ID %d!" % new_tile)
 		forest_harvest_counts.erase(player_tile) # Optional: stop tracking
