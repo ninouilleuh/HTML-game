@@ -11,15 +11,21 @@ var chasing := false
 
 func _ready():
 	# Snap goat to nearest tile center at start
+	var scene = get_tree().get_current_scene()
+	if scene == null or not scene.has_node("NavigationRegion2D/TileMap") or player == null:
+		return
 	var tilemap = get_tree().get_current_scene().get_node("NavigationRegion2D/TileMap")
 	var tile_pos = tilemap.local_to_map(position)
 	position = tilemap.map_to_local(tile_pos)
 	player = get_tree().get_current_scene().get_node("player") # Adjust path if needed
 
 func _process(delta):
-	var tilemap = get_tree().get_current_scene().get_node("NavigationRegion2D/TileMap")
+	var scene = get_tree().get_current_scene()
+	if scene == null or not scene.has_node("NavigationRegion2D/TileMap") or player == null:
+		return
+
+	var tilemap = scene.get_node("NavigationRegion2D/TileMap")
 	var current_tile = tilemap.local_to_map(position)
-	
 	var player_tile = tilemap.local_to_map(player.position)
 
 	# Check distance to player

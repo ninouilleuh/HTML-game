@@ -56,11 +56,10 @@ func _ready():
 	# Get the TileMap node
 	var tilemap = $NavigationRegion2D/TileMap
 
-	# Place player at the center tile (0, 0)
-	var center_tile = Vector2i(0, 0)
-	player.position = tilemap.map_to_local(center_tile)
-
-	# Generate initial chunks around the player
+	# Place player 
+	var spawn_tile = find_valid_spawn_tile(tilemap)
+	player.position = tilemap.map_to_local(spawn_tile)
+	# Generate initial chunks around the player (must be after setting position!)
 	tilemap.update_visible_chunks(player.position)
 	spawn_pigs_on_grass(20)
 	spawn_goats_on_mountains(10)
@@ -90,6 +89,7 @@ func _process(delta):
 	var tilemap = $NavigationRegion2D/TileMap
 	var player_tile = tilemap.local_to_map(player.position)
 	var tile_type = tilemap.get_cell_source_id(0, player_tile)
+	print("Player tile position: ", player_tile)
 	if player :
 		update_fog_of_war()
 	# fade to dark at night (between 18:00 and 6:00)
@@ -622,3 +622,25 @@ func update_fog_of_war():
 func is_blocker(tilemap, pos):
 	var tile_type = tilemap.get_cell_source_id(0, pos)
 	return tile_type == TILE_FOREST or tile_type == TILE_MOUNTAIN
+
+func find_valid_spawn_tile(tilemap):
+	var tries = 0
+	while tries < 1000:
+		var y = 0
+		# Pick a y in the grass biome bands
+		if randi() % 2 == 0:
+			y = randi_range(501, 1500)
+		else:
+			y = randi_range(-1500, -501)
+		var x = randi_range(WORLD_MIN, WORLD_MAX)
+		var chunk_size = tilemap.chunk_size
+		var chunk_coords = Vector2i(floor(x / chunk_size), floor(y / chunk_size))
+		if not tilemap.active_chunks.has(chunk_coords):
+			tilemap.generate_chunk(chunk_coords)
+		var tile_type = tilemap.get_cell_source_id(0, Vector2i(x, y))
+		if tile_type != TILE_MOUNTAIN :
+			return Vector2i(0, 500)
+		tries += 1
+	# fallback if not found
+	print("fallback position")
+	return Vector2i(0, 500)

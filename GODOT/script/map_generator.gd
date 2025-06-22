@@ -19,12 +19,19 @@ const TILE_SWAMP = 8
 const TILE_WATER = 9
 const TILE_WETLAND = 10
 const FOG_TILE_ID = 1 # Add your fog tile ID here
+const TILE_DESERT_SAND = 12
+const DRY_GRASS = 13
+const TILE_ROCKY_DESERT = 14
+const TILE_SALT_FLATS = 15
+const TILE_DRY_RIVERBED = 16
 
+const TILE_OASIS = 17
 
 var noise := FastNoiseLite.new()
 var generated_chunks := {}
 var active_chunks := {}
-
+var feature_noise := FastNoiseLite.new()
+var desert_mask_noise := FastNoiseLite.new()
 
 func _ready():
 	noise.seed = randi()
@@ -32,6 +39,11 @@ func _ready():
 	noise.fractal_octaves = 10
 	noise.fractal_lacunarity = 2.0
 	noise.fractal_gain = 0.5
+
+	feature_noise.seed = noise.seed + 12345 # Different seed for variety
+	feature_noise.frequency = 0.04          # Lower frequency for bigger features
+	desert_mask_noise.seed = noise.seed + 54321
+	desert_mask_noise.frequency = 0.003 # Very low frequency for big regions
 
 # Call this from your main/player script after player moves!
 func update_visible_chunks(player_pos: Vector2):
@@ -90,7 +102,129 @@ func generate_chunk(chunk_coords: Vector2i):
 		var elevation = e * 4000
 		var tile = TILE_GRASS
 
-		if y >= -500 and y <= 500:
+		# --- 1. Blended transition band  ---
+		if (y > 500 and y <= 750): #250 
+			var p = e
+			var blend = float(y - 500) / 250.0 # 0 at y=500, 1 at y=750
+			var blend_mask = feature_noise.get_noise_2d(float(x) * 1, float(y) * 1 + 12345) * 0.5 + 0.5
+
+			# Tropical tile (use your tropical logic)
+			var tropical_tile = TILE_GRASS
+			if p <= 0.30:
+				tropical_tile = TILE_FOREST
+			elif p <= 0.375:
+				tropical_tile = TILE_SWAMP
+			elif p <= 0.425:
+				tropical_tile = TILE_GRASS
+			elif p <= 0.475:
+				tropical_tile = TILE_WETLAND
+			elif p <= 0.50:
+				tropical_tile = TILE_GRASS
+			elif p <= 0.675:
+				tropical_tile = TILE_FOREST
+			elif p <= 0.75:
+				tropical_tile = TILE_HILL
+			elif p <= 0.87:
+				tropical_tile = TILE_HILL
+			elif p <= 0.90:
+				tropical_tile = TILE_FOREST
+			elif p <= 0.938:
+				tropical_tile = TILE_MOUNTAIN
+			elif p <= 0.98:
+				tropical_tile = TILE_FOREST
+			else:
+				tropical_tile = TILE_MOUNTAIN
+
+			# Subtropical tile (use your subtropical logic)
+			var mask = desert_mask_noise.get_noise_2d(float(x), float(y)) * 0.5 + 0.5
+			var subtropical_tile = DRY_GRASS
+			if mask < 0.6:
+				var f = feature_noise.get_noise_2d(float(x), float(y)) * 0.5 + 0.5
+				if f < 0.60:
+					subtropical_tile = TILE_DESERT_SAND
+				elif f < 0.80:
+					subtropical_tile = TILE_ROCKY_DESERT
+				elif f < 0.88:
+					var salt_cluster = feature_noise.get_noise_2d(float(x) * 0.02, float(y) * 0.02) * 0.5 + 0.5
+					if salt_cluster > 0.15:
+						subtropical_tile = TILE_SALT_FLATS
+					else:
+						subtropical_tile = TILE_DESERT_SAND
+				elif f < 0.98:
+					subtropical_tile = TILE_DRY_RIVERBED
+				else:
+					var oasis_cluster = feature_noise.get_noise_2d(float(x) * 0.003 + 1000, float(y) * 0.003 + 1000) * 0.5 + 0.5
+					if oasis_cluster > 0.45:
+						subtropical_tile = TILE_OASIS
+					else:
+						subtropical_tile = TILE_DESERT_SAND
+			else:
+				subtropical_tile = DRY_GRASS
+
+			# Use blend mask for smooth, patchy transition
+			if blend_mask < blend:
+				tile = subtropical_tile
+			else:
+				tile = tropical_tile
+		# --- 2. Blended transition band ---
+		elif (y >= -750 and y < -500): #250
+			var p = e
+			var blend = float(y + 750) / 250.0 # 0 at y=-750, 1 at y=-500
+			var blend_mask = feature_noise.get_noise_2d(float(x) * 1, float(y) * 1 + 12345) * 0.5 + 0.5
+			if blend_mask < blend:
+				# Tropical logic
+				if p <= 0.30:
+					tile = TILE_FOREST
+				elif p <= 0.375:
+					tile = TILE_SWAMP
+				elif p <= 0.425:
+					tile = TILE_GRASS
+				elif p <= 0.475:
+					tile = TILE_WETLAND
+				elif p <= 0.50:
+					tile = TILE_GRASS
+				elif p <= 0.675:
+					tile = TILE_FOREST
+				elif p <= 0.75:
+					tile = TILE_HILL
+				elif p <= 0.87:
+					tile = TILE_HILL
+				elif p <= 0.90:
+					tile = TILE_FOREST
+				elif p <= 0.938:
+					tile = TILE_MOUNTAIN
+				elif p <= 0.98:
+					tile = TILE_FOREST
+				else:
+					tile = TILE_MOUNTAIN
+			else:
+				# Subtropical logic (desert/dry grass)
+				var mask = desert_mask_noise.get_noise_2d(float(x), float(y)) * 0.5 + 0.5
+				if mask < 0.6:
+					var f = feature_noise.get_noise_2d(float(x), float(y)) * 0.5 + 0.5
+					if f < 0.60:
+						tile = TILE_DESERT_SAND
+					elif f < 0.80:
+						tile = TILE_ROCKY_DESERT
+					elif f < 0.88:
+						var salt_cluster = feature_noise.get_noise_2d(float(x) * 0.02, float(y) * 0.02) * 0.5 + 0.5
+						if salt_cluster > 0.15:
+							tile = TILE_SALT_FLATS
+						else:
+							tile = TILE_DESERT_SAND
+					elif f < 0.98:
+						tile = TILE_DRY_RIVERBED
+					else:
+						var oasis_cluster = feature_noise.get_noise_2d(float(x) * 0.003 + 1000, float(y) * 0.003 + 1000) * 0.5 + 0.5
+						if oasis_cluster > 0.45:
+							tile = TILE_OASIS
+						else:
+							tile = TILE_DESERT_SAND
+				else:
+					tile = DRY_GRASS
+
+		# --- 3. Main tropical biome --- #500 tiny
+		elif y >= -500 and y <= 500:
 			var p = e
 			if p <= 0.30:
 				tile = TILE_FOREST
@@ -116,6 +250,32 @@ func generate_chunk(chunk_coords: Vector2i):
 				tile = TILE_FOREST
 			else:
 				tile = TILE_MOUNTAIN
+
+		# --- 4. Main subtropical biome --- #1000 big 
+		elif (y > 750 and y <= 1750) or (y < -750 and y >= -1750): #subtropical biome
+			var mask = desert_mask_noise.get_noise_2d(float(x), float(y)) * 0.5 + 0.5
+			if mask < 0.6:
+				# Desert zone (same as before, with clusters)
+				var f = feature_noise.get_noise_2d(float(x), float(y)) * 0.5 + 0.5
+				if f < 0.60: #60 DESERT
+					tile = TILE_DESERT_SAND
+				elif f < 0.80: #20 ROCK
+					tile = TILE_ROCKY_DESERT
+				elif f < 0.81: # 1 SALT
+					# Salt flats cluster (less likely)
+					var salt_cluster = feature_noise.get_noise_2d(float(x) * 0.02, float(y) * 0.02) * 0.5 + 0.5
+					if salt_cluster > 0.59:
+						tile = TILE_SALT_FLATS
+					else:
+						tile = TILE_DESERT_SAND
+				elif f < 0.98: #  17 DRY RIV
+						tile = TILE_DRY_RIVERBED
+				else: #2 OASIS
+					tile = TILE_OASIS
+			else:
+				# Dry grass zone
+				tile = DRY_GRASS
+		# --- 5. Other biomes (optional) ---
 		else:
 			if elevation <= 400:
 				tile = TILE_WATER
