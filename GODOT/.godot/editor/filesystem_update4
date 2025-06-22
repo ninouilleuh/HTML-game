@@ -12,3 +12,5 @@ res://scenes/wall.tscn
 res://scenes/goat.tscn
 res://script/map_generator.gd
 res://script/game_over_screen.gd
+res://scenes/tutorial_screen.tscn
+res://scenes/tutorial_screen.gd

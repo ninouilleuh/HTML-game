@@ -697,8 +697,6 @@ func load_game():
 func _input(event):
 	if event.is_action_pressed("ui_save"):
 		save_game()
-	if event.is_action_pressed("ui_load"):
-		load_game()
 	if event.is_action_pressed("inventory"):
 		_on_inventory_button_pressed()
 	if event.is_action_pressed("build"):

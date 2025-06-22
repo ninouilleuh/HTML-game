@@ -1,14 +1,14 @@
+Label
+Panel
+CanvasLayer
 Sprite2D
 CharacterBody2D
 TileMap
-CanvasLayer
 ColorRect
-Label
 NavigationObstacle2D
 CollisionShape2D
 StaticBody2D
 Node2D
 PointLight2D
 VBoxContainer
-Panel
 Button
