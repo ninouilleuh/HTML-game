@@ -49,6 +49,7 @@ var goat_scene = preload("res://scenes/goat.tscn")
 var goats = []
 func _ready():
 	# Instance the player scene
+	print("hello world")
 	var player_scene = preload("res://scenes/player.tscn")
 	player = player_scene.instantiate()
 	add_child(player)
