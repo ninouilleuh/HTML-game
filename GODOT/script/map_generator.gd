@@ -24,7 +24,7 @@ const DRY_GRASS = 13
 const TILE_ROCKY_DESERT = 14
 const TILE_SALT_FLATS = 15
 const TILE_DRY_RIVERBED = 16
-
+const TILE_WALL = 11
 const TILE_OASIS = 17
 
 var noise := FastNoiseLite.new()
@@ -32,9 +32,12 @@ var generated_chunks := {}
 var active_chunks := {}
 var feature_noise := FastNoiseLite.new()
 var desert_mask_noise := FastNoiseLite.new()
+var placed_walls := {} # Key: Vector2i(tile_pos), Value: true
+var modified_tiles := {} # Key: Vector2i(tile_pos), Value: tile_id
 
 func _ready():
-	noise.seed = randi()
+	if noise.seed == 0:
+		noise.seed = randi()
 	noise.frequency = 1.0  # Similar to period in OpenSimplexNoise
 	noise.fractal_octaves = 10
 	noise.fractal_lacunarity = 2.0
@@ -298,11 +301,15 @@ func generate_chunk(chunk_coords: Vector2i):
 
 	# 4. Set tiles in the TileMap
 	for pos in tile_map.keys():
+		if modified_tiles.has(pos):
+			tile_map[pos] = modified_tiles[pos]
 		set_cell(0, pos, tile_map[pos], Vector2i(0, 0), 0)
 		# Place fog tile
 		var main = get_tree().get_root().get_node("Main")
 		var fog_tilemap = main.get_node("NavigationRegion2D/FogTileMap")
-		fog_tilemap.set_cell(0, pos, 1, Vector2i(0, 0), 0) # 1 = your fog tile ID
+		fog_tilemap.set_cell(0, pos, 1, Vector2i(0, 0), 0)
+		if placed_walls.has(pos):
+			set_cell(0, pos, TILE_WALL, Vector2i(0, 0), 0)
 	
 	var main = get_tree().get_root().get_node("Main") # Or "Main" if that's your node name
 	if main.unloaded_pigs.has(chunk_coords):

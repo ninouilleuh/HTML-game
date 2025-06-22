@@ -3,6 +3,11 @@ extends CanvasLayer
 
 
 func _on_new_game_button_pressed() -> void:
+	# Delete the save file
+	var save_path = "user://savegame.json"
+	if FileAccess.file_exists(save_path):
+		var dir = DirAccess.open("user://")
+		dir.remove("savegame.json")
 	get_tree().paused = false  # Unpause in case it was paused  # Optional: clean name for debugging
 	# Remove EVERYTHING from the root
 	for child in get_tree().root.get_children():

@@ -1,42 +1,49 @@
 extends Node2D
 
+# player
 var player
-
+# time 
 var time_of_day := 6.00 # Start at 6:00 (morning)
 var day := 1
+const HOURS_PER_DAY := 24
+const SECONDS_PER_HOUR := 60.0 # 1 hour = 1 minute real time
+# Dictionaries
 var inventory = {
 	"stick": 0,
 	"big_stick": 0,
 	"campfire": 0,
 	"wall": 0
 }
-var slot_scene := preload("res://scenes/InventorySlot.tscn")
 var item_icons = {
 	"stick": preload("res://assets/stick.png"),
 	"big_stick": preload("res://assets/big_stick.png"),
 	"campfire": preload("res://assets/campfire.png"),
 	"wall": preload("res://assets/wall.png")
 }
-
-const HOURS_PER_DAY := 24
-const SECONDS_PER_HOUR := 60.0 # 1 hour = 1 minute real time
-const TILE_FOREST = 0 
-const WORLD_MIN = -5000
-const WORLD_MAX = 5000
-const TILE_WALL = 11 # Set this to the correct tile ID for your wall
-const TILE_MOUNTAIN = 5
-var unloaded_pigs := {} # Key: chunk_coords, Value: Array of pig data (e.g., positions)
-var unloaded_campfires := {} # Key: chunk_coords, Value: Array of campfire data (e.g., positions)
-const TILE_GRASS = 2 # Use your actual grass tile ID
-var pig_scene = preload("res://scenes/pig.tscn")
-var pigs = []
-
 var recipes = {
 	"campfire": ["stick", "stick", "stick"],
 	"wall": ["big_stick"],# "big_stick", "big_stick", "big_stick", "big_stick"],
 	"big_stick": ["stick","stick","stick","stick","stick","stick"]
 }
-
+var unloaded_pigs := {} # Key: chunk_coords, Value: Array of pig data (e.g., positions)
+var unloaded_campfires := {} # Key: chunk_coords, Value: Array of campfire data (e.g., positions)
+var forest_harvest_counts := {} # Key: Vector2i(tile_pos), Value: int
+# Instanciate
+var slot_scene := preload("res://scenes/InventorySlot.tscn")
+var pig_scene = preload("res://scenes/pig.tscn")
+var goat_scene = preload("res://scenes/goat.tscn")
+#TILE AND MAP RELATED 
+const TILE_FOREST = 0 
+const WORLD_MIN = -5000
+const WORLD_MAX = 5000
+const TILE_WALL = 11 # Set this to the correct tile ID for your wall
+const TILE_MOUNTAIN = 5
+const TILE_GRASS = 2 # Use your actual grass tile ID
+# GROUPS
+var pigs = []
+var goats = []
+var placed_campfires := [] # Array of Vector2i tile positions
+#OTHER
 var is_placing := false
 var placing_item := ""
 var preview_sprite = null
@@ -44,10 +51,12 @@ var selected_recipe_index := 0
 var selected_inventory_index := 0
 var ui_focus := "inventory" # or "crafting_book"
 
-var forest_harvest_counts := {} # Key: Vector2i(tile_pos), Value: int
-var goat_scene = preload("res://scenes/goat.tscn")
-var goats = []
+
+
+
+#---- START GAME -----
 func _ready():
+	
 	# Instance the player scene
 	print("hello world")
 	var player_scene = preload("res://scenes/player.tscn")
@@ -60,6 +69,8 @@ func _ready():
 	# Place player 
 	var spawn_tile = find_valid_spawn_tile(tilemap)
 	player.position = tilemap.map_to_local(spawn_tile)
+	
+	load_game()
 	# Generate initial chunks around the player (must be after setting position!)
 	tilemap.update_visible_chunks(player.position)
 	spawn_pigs_on_grass(20)
@@ -67,33 +78,34 @@ func _ready():
 	var fog_tilemap = $NavigationRegion2D/FogTileMap
 	
 	
-	
+#---- PROCESS FUNCTION ---
 
 func _process(delta):
-	# Advance time
+		#MAP RELATED 
+		# After player moves, update visible chunks
+	$NavigationRegion2D/TileMap.update_visible_chunks(player.position)
+	
+		# Get the player's current tile and tile_type FIRST
+	var tilemap = $NavigationRegion2D/TileMap
+	var player_tile = tilemap.local_to_map(player.position)
+	var tile_type = tilemap.get_cell_source_id(0, player_tile)
+	if player :
+		update_fog_of_war()
+	# TIME RELATED 
+		# Advance time
 	time_of_day += delta / SECONDS_PER_HOUR
 	if time_of_day >= HOURS_PER_DAY:
 		time_of_day -= HOURS_PER_DAY
 		day += 1
 		print("Day ", day, " begins!")
 
-	# Update time label
+		# Update time label
 	var hour = int(time_of_day)
 	var minute = int((time_of_day - hour) * 60)
 	var time_string = "%02d:%02d" % [hour, minute]
 	$UI/TimePanel/TimeLabel.text = time_string
-
-	# After player moves, update visible chunks
-	$NavigationRegion2D/TileMap.update_visible_chunks(player.position)
 	
-	# Get the player's current tile and tile_type FIRST
-	var tilemap = $NavigationRegion2D/TileMap
-	var player_tile = tilemap.local_to_map(player.position)
-	var tile_type = tilemap.get_cell_source_id(0, player_tile)
-#	print("Player tile position: ", player_tile)
-	if player :
-		update_fog_of_war()
-	# fade to dark at night (between 18:00 and 6:00)
+		# fade to dark at NIGHT (between 18:00 and 6:00)
 	var overlay = $CanvasLayer/DayNightOverlay
 	var night_strength = 0
 	if time_of_day < 6.0:
@@ -103,7 +115,7 @@ func _process(delta):
 	else:
 		night_strength = 0
 
-	# Only add forest darkness if player is on a forest tile
+		#FOREST DARKNESS
 	if tile_type == TILE_FOREST:
 		var forest_count = 0
 		var radius = 2
@@ -115,24 +127,14 @@ func _process(delta):
 		var total_tiles = pow((radius * 2 + 1), 2) # 25 for 5x5
 		var forest_darkness = int(210 * (forest_count / total_tiles))
 		night_strength = min(night_strength + forest_darkness, 255)
-
+		#NIGHT + FOREST DARKNESS
 	overlay.color.a = night_strength / 255.0
-
+	#ACTION
+		# HARVEST ON FOREST 
 	$UI/HarvestButton.visible = (tile_type == TILE_FOREST)
-	
-#	if is_placing and preview_sprite:
-#		var mouse_pos = get_viewport().get_mouse_position()
-#		var world_pos = get_global_mouse_position()
-#		var tile = tilemap.local_to_map(world_pos)
-#		var tile_center = tilemap.map_to_local(tile)
-#		preview_sprite.position = tile_center
-	
 	if Input.is_action_just_pressed("action") and tile_type == TILE_FOREST and not $UI/CraftingBookWindow.visible :
 		_on_harvest_button_pressed()
-	if Input.is_action_just_pressed("inventory"):
-		_on_inventory_button_pressed()
-	if Input.is_action_just_pressed("build"):
-		_on_crafting_book_button_pressed()
+		# PLACING ITEM 
 	if Input.is_action_just_pressed("place") and placing_item != "":
 		place_object_on_tile(placing_item, player_tile)
 		# Only stop placing if you run out of the item
@@ -142,6 +144,7 @@ func _process(delta):
 			if preview_sprite:
 				preview_sprite.queue_free()
 				preview_sprite = null
+		# CRAFTING LOGIC FOCUS 
 	if $UI/CraftingBookWindow.visible and not $UI/InventoryWindow.visible:
 		var recipe_names = recipes.keys()
 		if Input.is_action_just_pressed("ui_up"):
@@ -158,6 +161,7 @@ func _process(delta):
 				craft_item(selected_recipe)
 				update_inventory_ui()
 				update_crafting_book()
+		# INVENTORY LOGIC FOCUS
 	if $UI/InventoryWindow.visible and not  $UI/CraftingBookWindow.visible :
 		var items = []
 		for item_name in inventory.keys():
@@ -176,6 +180,7 @@ func _process(delta):
 					is_placing = true
 					placing_item = item_name
 					$UI/InventoryWindow.visible = false
+		# FOCUS SWITCH LOGIC 
 	if $UI/InventoryWindow.visible and $UI/CraftingBookWindow.visible:
 		var items = []
 		for item_name in inventory.keys():
@@ -225,6 +230,8 @@ func _process(delta):
 					update_crafting_book()
 	
 	 # Gather campfire positions in screen UV (0-1) coordinates
+	
+	#CAMPFIRE SHADERS
 	var camera = get_viewport().get_camera_2d()
 	var viewport_center = get_viewport().size * 0.5
 	# Use the width as the scaling reference (or use .y for height, or average both for diagonal)
@@ -253,217 +260,9 @@ func _process(delta):
 		mat.set_shader_parameter("softness", 48.0 * screen_scale)     # <-- And this
 	
 	
-#func _input(event):
-#	if is_placing and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-#		print("clicked!")
-#		var tilemap = $NavigationRegion2D/TileMap
-#		var mouse_pos = get_viewport().get_mouse_position()
-#		var world_pos = get_global_mouse_position()
-#		var tile = tilemap.local_to_map(world_pos)
-#		# Place the campfire (e.g., set a tile, spawn a campfire node, etc.)
-#		place_object_on_tile(placing_item, tile)
-#		is_placing = false
-#		placing_item = ""
-#		if preview_sprite:
-#			preview_sprite.queue_free()
-#			preview_sprite = null
 
-func place_object_on_tile(item_name, tile):
-	var tilemap = $NavigationRegion2D/TileMap
-	if item_name == "campfire":
-		var campfire_scene = preload("res://scenes/Campfire.tscn")
-		var campfire = campfire_scene.instantiate()
-		campfire.position = tilemap.map_to_local(tile)
-		campfire.add_to_group("campfires")
-		add_child(campfire)
-		inventory[item_name] -= 1
-		update_inventory_ui()
-	elif item_name == "wall":
-		var wall_tile_id = TILE_WALL
-		tilemap.set_cell(0, tile, wall_tile_id, Vector2i(0, 0), 0)
-		tilemap.queue_redraw() # Request redraw (Godot 4)
-		$NavigationRegion2D.bake_navigation_polygon()
-		print(tile, TILE_WALL)
-		print("Placing wall at tile:", tile, "with ID:", TILE_WALL)
-		print("TileSet has tile for ID 3:", tilemap.tile_set.get_source(TILE_WALL) != null)
-		inventory[item_name] -= 1
-		update_inventory_ui()
 
-func _on_harvest_button_pressed() -> void:
-	var tilemap = $NavigationRegion2D/TileMap
-	var player_tile = tilemap.local_to_map(player.position)
-	
-	# Track harvest count for this tile
-	if not forest_harvest_counts.has(player_tile):
-		forest_harvest_counts[player_tile] = 0
-	forest_harvest_counts[player_tile] += 1
-
-	var rand = randi() % 100
-	if rand < 80:
-		inventory["stick"] += 1
-		print("You found a stick! Total sticks: %d" % inventory["stick"])
-	else:
-		inventory["big_stick"] += 1
-		print("You found a big stick! Total big sticks: %d" % inventory["big_stick"])
-
-	# If harvested more than 5 times, change the tile to the most common neighbor (except forest)
-	if forest_harvest_counts[player_tile] > 4: # 5 harvest max
-		var max_radius = 20 # You can set this to the number of tiles that covers your screen
-		var found = false
-		var neighbor_counts = {}
-		var new_tile = TILE_GRASS
-
-		for radius in range(1, max_radius + 1):
-			neighbor_counts.clear()
-			for dx in range(-radius, radius + 1):
-				for dy in range(-radius, radius + 1):
-					if dx == 0 and dy == 0:
-						continue
-					var neighbor_tile = player_tile + Vector2i(dx, dy)
-					var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
-					if neighbor_type != TILE_FOREST and neighbor_type != TILE_WALL:
-						neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
-			if neighbor_counts.size() > 0:
-				# Found at least one non-forest tile in this radius
-				var max_count = 0
-				for tile_type in neighbor_counts.keys():
-					if neighbor_counts[tile_type] > max_count:
-						max_count = neighbor_counts[tile_type]
-						new_tile = tile_type
-				found = true
-				break
-
-		# If nothing found after searching, default to grass
-		tilemap.set_cell(0, player_tile, new_tile, Vector2i(0, 0), 0)
-		print("The forest has been depleted and turned into tile ID %d!" % new_tile)
-		forest_harvest_counts.erase(player_tile) # Optional: stop tracking
-
-	update_inventory_ui()
-	update_crafting_book()
-
-func update_inventory_ui():
-	var slot_container = $UI/InventoryWindow/BackpackFrame/SlotContainer
-	for child in slot_container.get_children():
-		child.queue_free()
-
-	var items = []
-	for item_name in inventory.keys():
-		if inventory[item_name] > 0:
-			items.append(item_name)
-
-	var total_slots = max(2, items.size()) # Always show at least 2 slots
-
-	for i in range(total_slots):
-		var slot = slot_scene.instantiate()
-		var texture_rect = slot.get_node("Control/TextureRect")
-		var label = slot.get_node("Control/Label")
-		var invname = slot.get_node("Control/Name")
-		if i < items.size():
-			var item_name = items[i]
-			texture_rect.texture = item_icons.get(item_name, null)
-			label.text = "%d" % [inventory[item_name]]
-			invname.text = "%s" % [item_name.capitalize()]
-
-			# Highlight only if inventory is focused
-			var is_selected = i == selected_inventory_index and (
-				($UI/InventoryWindow.visible and not $UI/CraftingBookWindow.visible) or
-				($UI/InventoryWindow.visible and $UI/CraftingBookWindow.visible and ui_focus == "inventory")
-			)
-			if is_selected:
-				var style = StyleBoxFlat.new()
-				style.bg_color = Color(1, 1, 1, 0.7) # White with some transparency
-				slot.add_theme_stylebox_override("panel", style)
-				texture_rect.modulate = Color(1, 1, 1, 0.7) # White overlay on image
-			else:
-				slot.add_theme_stylebox_override("panel", null) # Reset to default
-				texture_rect.modulate = Color(1, 1, 1, 1) # Normal image
-
-			# Only connect for placeable items
-			if item_name == "campfire" or item_name == "wall":
-				texture_rect.gui_input.connect(func(event):
-					if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-						is_placing = true
-						placing_item = item_name
-						$UI/InventoryWindow.visible = false
-				)
-		else:
-			texture_rect.texture = null
-			label.text = ""
-			texture_rect.modulate = Color(0.2, 0.2, 0.2, 1) # faded/gray
-		
-		slot_container.add_child(slot)
-func _on_inventory_button_pressed() -> void:
-	$UI/InventoryWindow.visible = not $UI/InventoryWindow.visible
-func show_placement_preview(item_name):
-	if preview_sprite:
-		preview_sprite.queue_free()
-	preview_sprite = Sprite2D.new()
-	preview_sprite.texture = item_icons.get(item_name, null)
-	preview_sprite.modulate = Color(1, 1, 1, 0.5) # semi-transparent
-	add_child(preview_sprite)
-func spawn_pigs_on_grass(count: int):
-	var tilemap = $NavigationRegion2D/TileMap
-	var spawned = 0
-	var tries = 0
-	var min_distance = 50 # in tiles
-
-	var chunk_size = tilemap.chunk_size
-	var loaded_chunks = tilemap.active_chunks.keys() # Or adjust if it's an array
-
-	while spawned < count and tries < count * 50:
-		# Pick a random loaded chunk
-		var chunk_coords = loaded_chunks[randi() % loaded_chunks.size()]
-		var start_x = chunk_coords.x * chunk_size
-		var start_y = chunk_coords.y * chunk_size
-
-		# Pick a random tile within the chunk
-		var x = start_x + randi() % chunk_size
-		var y = start_y + randi() % chunk_size
-		var tile_pos = Vector2i(x, y)
-		var tile_type = tilemap.get_cell_source_id(0, tile_pos)
-
-		# Check grass and distance to other pigs
-		var too_close = false
-		for pig in pigs:
-			var pig_tile = tilemap.local_to_map(pig.position)
-			if pig_tile.distance_to(tile_pos) < min_distance:
-				too_close = true
-				break
-
-		if tile_type == TILE_GRASS and not too_close:
-			var pig = pig_scene.instantiate()
-			pig.name = "Pig"
-			# When spawning a pig
-			pig.chunk_coords = chunk_coords  
-			pig.position = tilemap.map_to_local(tile_pos)
-			add_child(pig)
-			pigs.append(pig)
-			spawned += 1
-		tries += 1
-
-func spawn_goats_on_mountains(count: int):
-	var tilemap = $NavigationRegion2D/TileMap
-	var spawned = 0
-	var tries = 0
-	var chunk_size = tilemap.chunk_size
-	var loaded_chunks = tilemap.active_chunks.keys()
-	while spawned < count and tries < count * 50:
-		var chunk_coords = loaded_chunks[randi() % loaded_chunks.size()]
-		var start_x = chunk_coords.x * chunk_size
-		var start_y = chunk_coords.y * chunk_size
-		var x = start_x + randi() % chunk_size
-		var y = start_y + randi() % chunk_size
-		var tile_pos = Vector2i(x, y)
-		var tile_type = tilemap.get_cell_source_id(0, tile_pos)
-		if tile_type == TILE_MOUNTAIN:
-			var goat = goat_scene.instantiate()
-			goat.position = tilemap.map_to_local(tile_pos)
-			goat.add_to_group("goats")
-			add_child(goat)
-			goats.append(goat)
-			spawned += 1
-		tries += 1
-
+#----------------- GAME OVER ---------------------------
 func game_over():
 	get_tree().paused = false  # Pause the game
 	self.hide() # Optionally hide the main node to prevent further processing
@@ -471,13 +270,8 @@ func game_over():
 	get_tree().get_root().add_child(game_over_scene)
 
 
-func _on_crafting_book_button_pressed() -> void:
-	$UI/CraftingBookWindow.visible = not $UI/CraftingBookWindow.visible
-	if $UI/CraftingBookWindow.visible:
-		selected_recipe_index = 0
-		update_crafting_book()
 	
-
+#----------------- CRAFT RELATED --------------------
 func update_crafting_book():
 	var recipe_list = $UI/CraftingBookWindow/RecipeList
 	for child in recipe_list.get_children():
@@ -554,6 +348,59 @@ func update_crafting_book():
 					update_crafting_book()
 			)
 		recipe_list.add_child(hbox)
+
+func update_inventory_ui():
+	var slot_container = $UI/InventoryWindow/BackpackFrame/SlotContainer
+	for child in slot_container.get_children():
+		child.queue_free()
+
+	var items = []
+	for item_name in inventory.keys():
+		if inventory[item_name] > 0:
+			items.append(item_name)
+
+	var total_slots = max(2, items.size()) # Always show at least 2 slots
+
+	for i in range(total_slots):
+		var slot = slot_scene.instantiate()
+		var texture_rect = slot.get_node("Control/TextureRect")
+		var label = slot.get_node("Control/Label")
+		var invname = slot.get_node("Control/Name")
+		if i < items.size():
+			var item_name = items[i]
+			texture_rect.texture = item_icons.get(item_name, null)
+			label.text = "%d" % [inventory[item_name]]
+			invname.text = "%s" % [item_name.capitalize()]
+
+			# Highlight only if inventory is focused
+			var is_selected = i == selected_inventory_index and (
+				($UI/InventoryWindow.visible and not $UI/CraftingBookWindow.visible) or
+				($UI/InventoryWindow.visible and $UI/CraftingBookWindow.visible and ui_focus == "inventory")
+			)
+			if is_selected:
+				var style = StyleBoxFlat.new()
+				style.bg_color = Color(1, 1, 1, 0.7) # White with some transparency
+				slot.add_theme_stylebox_override("panel", style)
+				texture_rect.modulate = Color(1, 1, 1, 0.7) # White overlay on image
+			else:
+				slot.add_theme_stylebox_override("panel", null) # Reset to default
+				texture_rect.modulate = Color(1, 1, 1, 1) # Normal image
+
+			# Only connect for placeable items
+			if item_name == "campfire" or item_name == "wall":
+				texture_rect.gui_input.connect(func(event):
+					if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+						is_placing = true
+						placing_item = item_name
+						$UI/InventoryWindow.visible = false
+				)
+		else:
+			texture_rect.texture = null
+			label.text = ""
+			texture_rect.modulate = Color(0.2, 0.2, 0.2, 1) # faded/gray
+		
+		slot_container.add_child(slot)
+
 func can_craft(recipe_name):
 	var needed = recipes[recipe_name].duplicate()
 	var inv = inventory.duplicate()
@@ -573,6 +420,32 @@ func craft_item(recipe_name):
 		inventory[recipe_name] = 0
 	inventory[recipe_name] += 1
 
+func place_object_on_tile(item_name, tile):
+	var tilemap = $NavigationRegion2D/TileMap
+	if item_name == "campfire":
+		var campfire_scene = preload("res://scenes/Campfire.tscn")
+		var campfire = campfire_scene.instantiate()
+		campfire.position = tilemap.map_to_local(tile)
+		campfire.add_to_group("campfires")
+		add_child(campfire)
+		placed_campfires.append(tile) # <-- Track campfire tile
+		inventory[item_name] -= 1
+		update_inventory_ui()
+	elif item_name == "wall":
+		var wall_tile_id = TILE_WALL
+		tilemap.set_cell(0, tile, wall_tile_id, Vector2i(0, 0), 0)
+		tilemap.placed_walls[tile] = true
+		tilemap.modified_tiles[tile] = TILE_WALL
+		tilemap.queue_redraw() # Request redraw (Godot 4)
+		$NavigationRegion2D.bake_navigation_polygon()
+
+		print(tile, TILE_WALL)
+		print("Placing wall at tile:", tile, "with ID:", TILE_WALL)
+		print("TileSet has tile for ID 3:", tilemap.tile_set.get_source(TILE_WALL) != null)
+		inventory[item_name] -= 1
+		update_inventory_ui()
+
+#-------------------- FOG OF WAR -----------------
 func compute_fov(tilemap: TileMap, origin: Vector2i, radius: int, is_blocker: Callable) -> Dictionary:
 	var visible := {}
 	visible[origin] = true
@@ -624,6 +497,9 @@ func is_blocker(tilemap, pos):
 	var tile_type = tilemap.get_cell_source_id(0, pos)
 	return tile_type == TILE_FOREST or tile_type == TILE_MOUNTAIN
 
+
+#--------------SPAWN RELATED  ---------------------------
+# PLAYER 
 func find_valid_spawn_tile(tilemap):
 	var tries = 0
 	while tries < 1000:
@@ -645,3 +521,247 @@ func find_valid_spawn_tile(tilemap):
 	# fallback if not found
 	print("fallback position")
 	return Vector2i(0, 0)
+# PIG
+func spawn_pigs_on_grass(count: int):
+	var tilemap = $NavigationRegion2D/TileMap
+	var spawned = 0
+	var tries = 0
+	var min_distance = 50 # in tiles
+
+	var chunk_size = tilemap.chunk_size
+	var loaded_chunks = tilemap.active_chunks.keys() # Or adjust if it's an array
+
+	while spawned < count and tries < count * 50:
+		# Pick a random loaded chunk
+		var chunk_coords = loaded_chunks[randi() % loaded_chunks.size()]
+		var start_x = chunk_coords.x * chunk_size
+		var start_y = chunk_coords.y * chunk_size
+
+		# Pick a random tile within the chunk
+		var x = start_x + randi() % chunk_size
+		var y = start_y + randi() % chunk_size
+		var tile_pos = Vector2i(x, y)
+		var tile_type = tilemap.get_cell_source_id(0, tile_pos)
+
+		# Check grass and distance to other pigs
+		var too_close = false
+		for pig in pigs:
+			var pig_tile = tilemap.local_to_map(pig.position)
+			if pig_tile.distance_to(tile_pos) < min_distance:
+				too_close = true
+				break
+
+		if tile_type == TILE_GRASS and not too_close:
+			var pig = pig_scene.instantiate()
+			pig.name = "Pig"
+			# When spawning a pig
+			pig.chunk_coords = chunk_coords  
+			pig.position = tilemap.map_to_local(tile_pos)
+			add_child(pig)
+			pigs.append(pig)
+			spawned += 1
+		tries += 1
+# GOAT 
+func spawn_goats_on_mountains(count: int):
+	var tilemap = $NavigationRegion2D/TileMap
+	var spawned = 0
+	var tries = 0
+	var chunk_size = tilemap.chunk_size
+	var loaded_chunks = tilemap.active_chunks.keys()
+	while spawned < count and tries < count * 50:
+		var chunk_coords = loaded_chunks[randi() % loaded_chunks.size()]
+		var start_x = chunk_coords.x * chunk_size
+		var start_y = chunk_coords.y * chunk_size
+		var x = start_x + randi() % chunk_size
+		var y = start_y + randi() % chunk_size
+		var tile_pos = Vector2i(x, y)
+		var tile_type = tilemap.get_cell_source_id(0, tile_pos)
+		if tile_type == TILE_MOUNTAIN:
+			var goat = goat_scene.instantiate()
+			goat.position = tilemap.map_to_local(tile_pos)
+			goat.add_to_group("goats")
+			add_child(goat)
+			goats.append(goat)
+			spawned += 1
+		tries += 1
+
+#------------------------SAVE FILE -----------------------
+const SAVE_PATH = "user://savegame.json"
+
+func save_game():
+	var tilemap = $NavigationRegion2D/TileMap
+	var save_data = {
+		"player_pos": player.position,
+		"inventory": inventory,
+		"modified_tiles": tilemap.modified_tiles,
+		"placed_walls": tilemap.placed_walls,
+		"placed_campfires": placed_campfires, # <-- Add this
+		"forest_harvest_counts": forest_harvest_counts,
+		"day": day,
+		"time_of_day": time_of_day,
+		"noise_seed": tilemap.noise.seed,
+	}
+	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	file.store_string(JSON.stringify(save_data))
+	file.close()
+	print("Game saved!")
+
+func load_game():
+	var tilemap = $NavigationRegion2D/TileMap
+	if not FileAccess.file_exists(SAVE_PATH):
+		print("No save file found.")
+		return
+	var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var save_data = JSON.parse_string(file.get_as_text())
+	file.close()
+	
+	if typeof(save_data) == TYPE_DICTIONARY:
+		var pos = save_data.get("player_pos", player.position)
+		if typeof(pos) == TYPE_STRING:
+			var numbers = pos.strip_edges().trim_prefix("(").trim_suffix(")").split(",")
+			if numbers.size() == 2:
+				player.position = Vector2(numbers[0].to_float(), numbers[1].to_float())
+			else:
+				player.position = Vector2.ZERO
+		elif typeof(pos) == TYPE_DICTIONARY and pos.has("x") and pos.has("y"):
+			player.position = Vector2(pos["x"], pos["y"])
+		else:
+			player.position = pos
+
+		inventory = save_data.get("inventory", inventory)
+		# After loading from save_data:
+		tilemap.modified_tiles = save_data.get("modified_tiles", {})
+		tilemap.placed_walls = save_data.get("placed_walls", {})
+
+		# Convert string keys to Vector2i for modified_tiles
+		var fixed_modified_tiles = {}
+		for k in tilemap.modified_tiles.keys():
+			var v = tilemap.modified_tiles[k]
+			if typeof(k) == TYPE_STRING:
+				var numbers = k.strip_edges().trim_prefix("(").trim_suffix(")").split(",")
+				if numbers.size() == 2:
+					fixed_modified_tiles[Vector2i(numbers[0].to_int(), numbers[1].to_int())] = v
+			else:
+				fixed_modified_tiles[k] = v
+		tilemap.modified_tiles = fixed_modified_tiles
+
+		# Convert string keys to Vector2i for placed_walls
+		var fixed_placed_walls = {}
+		for k in tilemap.placed_walls.keys():
+			var v = tilemap.placed_walls[k]
+			if typeof(k) == TYPE_STRING:
+				var numbers = k.strip_edges().trim_prefix("(").trim_suffix(")").split(",")
+				if numbers.size() == 2:
+					fixed_placed_walls[Vector2i(numbers[0].to_int(), numbers[1].to_int())] = v
+			else:
+				fixed_placed_walls[k] = v
+		tilemap.placed_walls = fixed_placed_walls
+
+		placed_campfires = save_data.get("placed_campfires", []) # <-- ADD THIS LINE
+		forest_harvest_counts = save_data.get("forest_harvest_counts", {})
+		day = save_data.get("day", 1)
+		time_of_day = save_data.get("time_of_day", 6.0)
+		if save_data.has("noise_seed"):
+			tilemap.noise.seed = save_data["noise_seed"]
+			tilemap.feature_noise.seed = tilemap.noise.seed + 12345
+			tilemap.desert_mask_noise.seed = tilemap.noise.seed + 54321
+
+		# After loading, refresh the world:
+		tilemap.update_visible_chunks(player.position)
+
+		# Restore campfires
+		for tile in placed_campfires:
+			var tile_vec : Vector2i
+			if typeof(tile) == TYPE_STRING:
+				var numbers = tile.strip_edges().trim_prefix("(").trim_suffix(")").split(",")
+				if numbers.size() == 2:
+					tile_vec = Vector2i(numbers[0].to_int(), numbers[1].to_int())
+				else:
+					continue
+			else:
+				tile_vec = tile
+			var campfire_scene = preload("res://scenes/Campfire.tscn")
+			var campfire = campfire_scene.instantiate()
+			campfire.position = tilemap.map_to_local(tile_vec)
+			campfire.add_to_group("campfires")
+			add_child(campfire)
+
+		update_inventory_ui()      # <-- ADD THIS
+		update_crafting_book()     # <-- AND THIS
+
+		print("Game loaded!")
+	else:
+		print("Failed to load save data.")
+
+# -----------------------INPUT MANAGEMENT -------------
+func _input(event):
+	if event.is_action_pressed("ui_save"):
+		save_game()
+	if event.is_action_pressed("ui_load"):
+		load_game()
+	if event.is_action_pressed("inventory"):
+		_on_inventory_button_pressed()
+	if event.is_action_pressed("build"):
+		_on_crafting_book_button_pressed()
+
+func _on_crafting_book_button_pressed() -> void:
+	$UI/CraftingBookWindow.visible = not $UI/CraftingBookWindow.visible
+	if $UI/CraftingBookWindow.visible:
+		selected_recipe_index = 0
+		update_crafting_book()
+
+func _on_inventory_button_pressed() -> void:
+	$UI/InventoryWindow.visible = not $UI/InventoryWindow.visible
+
+func _on_harvest_button_pressed() -> void:
+	var tilemap = $NavigationRegion2D/TileMap
+	var player_tile = tilemap.local_to_map(player.position)
+	
+	# Track harvest count for this tile
+	if not forest_harvest_counts.has(player_tile):
+		forest_harvest_counts[player_tile] = 0
+	forest_harvest_counts[player_tile] += 1
+
+	var rand = randi() % 100
+	if rand < 80:
+		inventory["stick"] += 1
+		print("You found a stick! Total sticks: %d" % inventory["stick"])
+	else:
+		inventory["big_stick"] += 1
+		print("You found a big stick! Total big sticks: %d" % inventory["big_stick"])
+
+	# If harvested more than 5 times, change the tile to the most common neighbor (except forest)
+	if forest_harvest_counts[player_tile] > 4: # 5 harvest max
+		var max_radius = 20 # You can set this to the number of tiles that covers your screen
+		var found = false
+		var neighbor_counts = {}
+		var new_tile = TILE_GRASS
+
+		for radius in range(1, max_radius + 1):
+			neighbor_counts.clear()
+			for dx in range(-radius, radius + 1):
+				for dy in range(-radius, radius + 1):
+					if dx == 0 and dy == 0:
+						continue
+					var neighbor_tile = player_tile + Vector2i(dx, dy)
+					var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
+					if neighbor_type != TILE_FOREST and neighbor_type != TILE_WALL:
+						neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
+			if neighbor_counts.size() > 0:
+				# Found at least one non-forest tile in this radius
+				var max_count = 0
+				for tile_type in neighbor_counts.keys():
+					if neighbor_counts[tile_type] > max_count:
+						max_count = neighbor_counts[tile_type]
+						new_tile = tile_type
+				found = true
+				break
+
+		# If nothing found after searching, default to grass
+		tilemap.set_cell(0, player_tile, new_tile, Vector2i(0, 0), 0)
+		tilemap.modified_tiles[player_tile] = new_tile
+		print("The forest has been depleted and turned into tile ID %d!" % new_tile)
+		forest_harvest_counts.erase(player_tile) # Optional: stop tracking
+
+	update_inventory_ui()
+	update_crafting_book()

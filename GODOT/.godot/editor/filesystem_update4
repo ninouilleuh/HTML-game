@@ -11,3 +11,4 @@ res://scenes/Campfire.tscn
 res://scenes/wall.tscn
 res://scenes/goat.tscn
 res://script/map_generator.gd
+res://script/game_over_screen.gd
