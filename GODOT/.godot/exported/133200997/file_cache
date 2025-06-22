@@ -1,8 +1,9 @@
-res://scenes/InventorySlot.tscn::44743c2ba9f78a4f670927185d6be3b8::1750533500::res://.godot/exported/133200997/export-0a1e758c6e533e8b77b66a8598ec4e1a-InventorySlot.scn
-res://scenes/main.tscn::fcd725bb22ca6e9ad7ec02aa7c24c270::1750533500::res://.godot/exported/133200997/export-3ad5c15c4f3250da0cc7c1af1770d85f-main.scn
-res://scenes/pig.tscn::1660618dd401fec2ced5a16b401aa65f::1750533500::res://.godot/exported/133200997/export-24640610ee7e4e85f23801964c2580de-pig.scn
-res://scenes/player.tscn::01318e95e9f1a9757bc2fe0f6be4bcf0::1750533500::res://.godot/exported/133200997/export-234fb6894ec6226e856ab7f825500d3d-player.scn
+res://scenes/InventorySlot.tscn::44743c2ba9f78a4f670927185d6be3b8::1750536704::res://.godot/exported/133200997/export-0a1e758c6e533e8b77b66a8598ec4e1a-InventorySlot.scn
+res://scenes/main.tscn::fcd725bb22ca6e9ad7ec02aa7c24c270::1750536703::res://.godot/exported/133200997/export-3ad5c15c4f3250da0cc7c1af1770d85f-main.scn
+res://scenes/pig.tscn::1660618dd401fec2ced5a16b401aa65f::1750536704::res://.godot/exported/133200997/export-24640610ee7e4e85f23801964c2580de-pig.scn
+res://scenes/player.tscn::01318e95e9f1a9757bc2fe0f6be4bcf0::1750536843::res://.godot/exported/133200997/export-234fb6894ec6226e856ab7f825500d3d-player.scn
 res://tiles/terrain_tileset.tres::11d3e0f3be6d8e2e2d8ebeee7df6726b::1750533498::res://.godot/exported/133200997/export-eda5fec0e3ba2f182f686e3e1c30587f-terrain_tileset.res
-res://scenes/Campfire.tscn::c5716f11d4c51798e7b41128584f2514::1750533500::res://.godot/exported/133200997/export-98e90d37dda544405389fef198c45ec2-Campfire.scn
-res://scenes/GameOverScreen.tscn::27a5bc9d760b03a258d683f40f112eb4::1750533500::res://.godot/exported/133200997/export-aa996ab80e1909f27faa687360b25217-GameOverScreen.scn
-res://scenes/wall.tscn::f35dbb76af8b21909b4f57899050cc1a::1750533500::res://.godot/exported/133200997/export-07690686bd1a72f71ae2b53bb79af276-wall.scn
+res://scenes/Campfire.tscn::c5716f11d4c51798e7b41128584f2514::1750536704::res://.godot/exported/133200997/export-98e90d37dda544405389fef198c45ec2-Campfire.scn
+res://scenes/GameOverScreen.tscn::27a5bc9d760b03a258d683f40f112eb4::1750536704::res://.godot/exported/133200997/export-aa996ab80e1909f27faa687360b25217-GameOverScreen.scn
+res://scenes/wall.tscn::f35dbb76af8b21909b4f57899050cc1a::1750536704::res://.godot/exported/133200997/export-07690686bd1a72f71ae2b53bb79af276-wall.scn
+res://scenes/goat.tscn::7e224d5873aa7bdf235acd4ff07afaf9::1750536704::res://.godot/exported/133200997/export-8755f6071bcdbde45c7b4d153be4c991-goat.scn
