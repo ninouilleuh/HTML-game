@@ -89,7 +89,7 @@ func _process(delta):
 	var tilemap = $NavigationRegion2D/TileMap
 	var player_tile = tilemap.local_to_map(player.position)
 	var tile_type = tilemap.get_cell_source_id(0, player_tile)
-	print("Player tile position: ", player_tile)
+#	print("Player tile position: ", player_tile)
 	if player :
 		update_fog_of_war()
 	# fade to dark at night (between 18:00 and 6:00)
@@ -639,8 +639,8 @@ func find_valid_spawn_tile(tilemap):
 			tilemap.generate_chunk(chunk_coords)
 		var tile_type = tilemap.get_cell_source_id(0, Vector2i(x, y))
 		if tile_type != TILE_MOUNTAIN :
-			return Vector2i(0, 500)
+			return Vector2i(0, 0)
 		tries += 1
 	# fallback if not found
 	print("fallback position")
-	return Vector2i(0, 500)
+	return Vector2i(0, 0)
