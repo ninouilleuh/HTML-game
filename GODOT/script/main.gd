@@ -77,8 +77,8 @@ func _ready():
 	load_game()
 	# Generate initial chunks around the player (must be after setting position!)
 	tilemap.update_visible_chunks(player.position)
-	#spawn_pigs_on_grass(20)
-	spawn_goats_on_mountains(1)
+	spawn_pigs_on_grass(20)
+	spawn_goats_on_mountains(10)
 	var fog_tilemap = $NavigationRegion2D/FogTileMap
 	
 	
@@ -510,9 +510,9 @@ func find_valid_spawn_tile(tilemap):
 		var y = 0
 		# Pick a y in the grass biome bands
 		if randi() % 2 == 0:
-			y = randi_range(501, 1500)
+			y = randi_range(0, 1500)
 		else:
-			y = randi_range(-1500, -501)
+			y = randi_range(-1500, 0)
 		var x = randi_range(WORLD_MIN, WORLD_MAX)
 		var chunk_size = tilemap.chunk_size
 		var chunk_coords = Vector2i(floor(x / chunk_size), floor(y / chunk_size))
@@ -520,11 +520,11 @@ func find_valid_spawn_tile(tilemap):
 			tilemap.generate_chunk(chunk_coords)
 		var tile_type = tilemap.get_cell_source_id(0, Vector2i(x, y))
 		if tile_type != TILE_MOUNTAIN :
-			return Vector2i(0, 1750)
+			return Vector2i(x, y)
 		tries += 1
 	# fallback if not founds
 	print("fallback position")
-	return Vector2i(0, 1750)
+	return Vector2i(0, 0)
 # PIG
 func spawn_pigs_on_grass(count: int):
 	var tilemap = $NavigationRegion2D/TileMap

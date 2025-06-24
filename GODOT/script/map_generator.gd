@@ -71,13 +71,12 @@ func update_visible_chunks(player_pos: Vector2):
 	var main = get_tree().get_current_scene() # or "Main" if that's your main node name
 	if main and main.has_method("spawn_pigs_on_grass"):
 		if main.pigs.size() < 20:
-			pass
-			#main.spawn_pigs_on_grass(10)
+			main.spawn_pigs_on_grass(10)
 
 	# --- Add this for goats ---
 	if main and main.has_method("spawn_goats_on_mountains"):
 		if main.goats.size() < 10:
-			main.spawn_goats_on_mountains(1)
+			main.spawn_goats_on_mountains(5)
 			
 
 
@@ -417,5 +416,7 @@ func unload_chunk(chunk_coords: Vector2i):
 	# After removing pigs, check if we need to spawn more
 	if main and main.has_method("spawn_pigs_on_grass"):
 		if main.pigs.size() < 10: # or whatever your minimum is
-			pass
-			#main.spawn_pigs_on_grass(10)
+			main.spawn_pigs_on_grass(10)
+	if main and main.has_method("spawn_goats_on_mountains"):
+		if main.goats.size() < 5:
+			main.spawn_goats_on_mountains(5)
