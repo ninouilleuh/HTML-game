@@ -12,13 +12,15 @@ var inventory = {
 	"stick": 0,
 	"big_stick": 0,
 	"campfire": 0,
-	"wall": 0
+	"wall": 0,
+	"salt": 0
 }
 var item_icons = {
 	"stick": preload("res://assets/stick.png"),
 	"big_stick": preload("res://assets/big_stick.png"),
 	"campfire": preload("res://assets/campfire.png"),
-	"wall": preload("res://assets/wall.png")
+	"wall": preload("res://assets/wall.png"),
+	#"salt": preload("res://tileset/saltflats.png")
 }
 var recipes = {
 	"campfire": ["stick", "stick", "stick"],
@@ -27,6 +29,7 @@ var recipes = {
 }
 var unloaded_pigs := {} # Key: chunk_coords, Value: Array of pig data (e.g., positions)
 var unloaded_campfires := {} # Key: chunk_coords, Value: Array of campfire data (e.g., positions)
+var unloaded_goats := {} # Key: chunk_coords, Value: Array of goat data (position, demonic, demonic_timer)
 var forest_harvest_counts := {} # Key: Vector2i(tile_pos), Value: int
 # Instanciate
 var slot_scene := preload("res://scenes/InventorySlot.tscn")
@@ -39,6 +42,7 @@ const WORLD_MAX = 5000
 const TILE_WALL = 11 # Set this to the correct tile ID for your wall
 const TILE_MOUNTAIN = 5
 const TILE_GRASS = 2 # Use your actual grass tile ID
+const TILE_SALTFLATS = 15 # Set this to the correct tile ID for saltflats
 # GROUPS
 var pigs = []
 var goats = []
@@ -73,8 +77,8 @@ func _ready():
 	load_game()
 	# Generate initial chunks around the player (must be after setting position!)
 	tilemap.update_visible_chunks(player.position)
-	spawn_pigs_on_grass(20)
-	spawn_goats_on_mountains(10)
+	#spawn_pigs_on_grass(20)
+	spawn_goats_on_mountains(1)
 	var fog_tilemap = $NavigationRegion2D/FogTileMap
 	
 	
@@ -131,8 +135,8 @@ func _process(delta):
 	overlay.color.a = night_strength / 255.0
 	#ACTION
 		# HARVEST ON FOREST 
-	$UI/HarvestButton.visible = (tile_type == TILE_FOREST)
-	if Input.is_action_just_pressed("action") and tile_type == TILE_FOREST and not $UI/CraftingBookWindow.visible :
+	$UI/HarvestButton.visible = (tile_type == TILE_FOREST or tile_type == TILE_SALTFLATS)
+	if Input.is_action_just_pressed("action") and (tile_type == TILE_FOREST or tile_type == TILE_SALTFLATS) and not $UI/CraftingBookWindow.visible :
 		_on_harvest_button_pressed()
 		# PLACING ITEM 
 	if Input.is_action_just_pressed("place") and placing_item != "":
@@ -499,7 +503,7 @@ func is_blocker(tilemap, pos):
 
 
 #--------------SPAWN RELATED  ---------------------------
-# PLAYER 
+# PLAYER POSITION
 func find_valid_spawn_tile(tilemap):
 	var tries = 0
 	while tries < 1000:
@@ -516,11 +520,11 @@ func find_valid_spawn_tile(tilemap):
 			tilemap.generate_chunk(chunk_coords)
 		var tile_type = tilemap.get_cell_source_id(0, Vector2i(x, y))
 		if tile_type != TILE_MOUNTAIN :
-			return Vector2i(0, 0)
+			return Vector2i(0, 1750)
 		tries += 1
-	# fallback if not found
+	# fallback if not founds
 	print("fallback position")
-	return Vector2i(0, 0)
+	return Vector2i(0, 1750)
 # PIG
 func spawn_pigs_on_grass(count: int):
 	var tilemap = $NavigationRegion2D/TileMap
@@ -714,52 +718,84 @@ func _on_inventory_button_pressed() -> void:
 func _on_harvest_button_pressed() -> void:
 	var tilemap = $NavigationRegion2D/TileMap
 	var player_tile = tilemap.local_to_map(player.position)
-	
+	var tile_type = tilemap.get_cell_source_id(0, player_tile)
 	# Track harvest count for this tile
-	if not forest_harvest_counts.has(player_tile):
-		forest_harvest_counts[player_tile] = 0
-	forest_harvest_counts[player_tile] += 1
-
-	var rand = randi() % 100
-	if rand < 80:
-		inventory["stick"] += 1
-		print("You found a stick! Total sticks: %d" % inventory["stick"])
-	else:
-		inventory["big_stick"] += 1
-		print("You found a big stick! Total big sticks: %d" % inventory["big_stick"])
-
-	# If harvested more than 5 times, change the tile to the most common neighbor (except forest)
-	if forest_harvest_counts[player_tile] > 4: # 5 harvest max
-		var max_radius = 20 # You can set this to the number of tiles that covers your screen
-		var found = false
-		var neighbor_counts = {}
-		var new_tile = TILE_GRASS
-
-		for radius in range(1, max_radius + 1):
-			neighbor_counts.clear()
-			for dx in range(-radius, radius + 1):
-				for dy in range(-radius, radius + 1):
-					if dx == 0 and dy == 0:
-						continue
-					var neighbor_tile = player_tile + Vector2i(dx, dy)
-					var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
-					if neighbor_type != TILE_FOREST and neighbor_type != TILE_WALL:
-						neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
-			if neighbor_counts.size() > 0:
-				# Found at least one non-forest tile in this radius
-				var max_count = 0
-				for tile_type in neighbor_counts.keys():
-					if neighbor_counts[tile_type] > max_count:
-						max_count = neighbor_counts[tile_type]
-						new_tile = tile_type
-				found = true
-				break
-
-		# If nothing found after searching, default to grass
-		tilemap.set_cell(0, player_tile, new_tile, Vector2i(0, 0), 0)
-		tilemap.modified_tiles[player_tile] = new_tile
-		print("The forest has been depleted and turned into tile ID %d!" % new_tile)
-		forest_harvest_counts.erase(player_tile) # Optional: stop tracking
-
+	if tile_type == TILE_FOREST:
+		if not forest_harvest_counts.has(player_tile):
+			forest_harvest_counts[player_tile] = 0
+		forest_harvest_counts[player_tile] += 1
+		var rand = randi() % 100
+		if rand < 80:
+			inventory["stick"] += 1
+			print("You found a stick! Total sticks: %d" % inventory["stick"])
+		else:
+			inventory["big_stick"] += 1
+			print("You found a big stick! Total big sticks: %d" % inventory["big_stick"])
+		# If harvested more than 5 times, change the tile to the most common neighbor (except forest)
+		if forest_harvest_counts[player_tile] > 4: # 5 harvest max
+			var max_radius = 20 # You can set this to the number of tiles that covers your screen
+			var found = false
+			var neighbor_counts = {}
+			var new_tile = TILE_GRASS
+			for radius in range(1, max_radius + 1):
+				neighbor_counts.clear()
+				for dx in range(-radius, radius + 1):
+					for dy in range(-radius, radius + 1):
+						if dx == 0 and dy == 0:
+							continue
+						var neighbor_tile = player_tile + Vector2i(dx, dy)
+						var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
+						if neighbor_type != TILE_FOREST and neighbor_type != TILE_WALL:
+							neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
+				if neighbor_counts.size() > 0:
+					# Found at least one non-forest tile in this radius
+					var max_count = 0
+					for neighbor_type in neighbor_counts.keys():
+						if neighbor_counts[neighbor_type] > max_count:
+							max_count = neighbor_counts[neighbor_type]
+							new_tile = neighbor_type
+					found = true
+					break
+			# If nothing found after searching, default to grass
+			tilemap.set_cell(0, player_tile, new_tile, Vector2i(0, 0), 0)
+			tilemap.modified_tiles[player_tile] = new_tile
+			print("The forest has been depleted and turned into tile ID %d!" % new_tile)
+			forest_harvest_counts.erase(player_tile) # Optional: stop tracking
+	elif tile_type == TILE_SALTFLATS:
+		# Track harvest count for this tile
+		if not forest_harvest_counts.has(player_tile):
+			forest_harvest_counts[player_tile] = 0
+		forest_harvest_counts[player_tile] += 1
+		inventory["salt"] += 1
+		print("You found salt! Total salt: %d" % inventory["salt"])
+		# Deplete saltflats after 4 harvest, turn into most abundant walkable neighbor
+		if forest_harvest_counts[player_tile] >= 4:
+			var max_radius = 20
+			var found = false
+			var neighbor_counts = {}
+			var new_tile = 3 # TILE_DESERTSAND, update this if you have a constant
+			for radius in range(1, max_radius + 1):
+				neighbor_counts.clear()
+				for dx in range(-radius, radius + 1):
+					for dy in range(-radius, radius + 1):
+						if dx == 0 and dy == 0:
+							continue
+						var neighbor_tile = player_tile + Vector2i(dx, dy)
+						var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
+						if neighbor_type != TILE_SALTFLATS and neighbor_type != TILE_WALL and neighbor_type != TILE_MOUNTAIN:
+							neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
+				if neighbor_counts.size() > 0:
+					var max_count = 0
+					for neighbor_type in neighbor_counts.keys():
+						if neighbor_counts[neighbor_type] > max_count:
+							max_count = neighbor_counts[neighbor_type]
+							new_tile = neighbor_type
+					found = true
+					break
+			# If nothing found after searching, default to sand (tile ID 3)
+			tilemap.set_cell(0, player_tile, new_tile, Vector2i(0, 0), 0)
+			tilemap.modified_tiles[player_tile] = new_tile
+			print("The saltflats have been depleted and turned into tile ID %d!" % new_tile)
+			forest_harvest_counts.erase(player_tile)
 	update_inventory_ui()
 	update_crafting_book()

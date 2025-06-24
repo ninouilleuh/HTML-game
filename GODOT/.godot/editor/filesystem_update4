@@ -2,7 +2,6 @@ res://scenes/main.tscn
 res://tiles/terrain_tileset.tres
 res://scenes/campfire.gdshader
 res://scenes/fog.gdshader
-res://script/main.gd
 res://scenes/player.tscn
 res://scenes/InventorySlot.tscn
 res://scenes/pig.tscn
@@ -10,7 +9,7 @@ res://scenes/GameOverScreen.tscn
 res://scenes/Campfire.tscn
 res://scenes/wall.tscn
 res://scenes/goat.tscn
-res://script/map_generator.gd
-res://script/game_over_screen.gd
 res://scenes/tutorial_screen.tscn
-res://scenes/tutorial_screen.gd
+res://script/main.gd
+res://scenes/goat.gd
+res://script/map_generator.gd

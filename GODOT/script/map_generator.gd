@@ -71,12 +71,14 @@ func update_visible_chunks(player_pos: Vector2):
 	var main = get_tree().get_current_scene() # or "Main" if that's your main node name
 	if main and main.has_method("spawn_pigs_on_grass"):
 		if main.pigs.size() < 20:
-			main.spawn_pigs_on_grass(10)
+			pass
+			#main.spawn_pigs_on_grass(10)
 
 	# --- Add this for goats ---
 	if main and main.has_method("spawn_goats_on_mountains"):
 		if main.goats.size() < 10:
-			main.spawn_goats_on_mountains(5)
+			main.spawn_goats_on_mountains(1)
+			
 
 
 func generate_chunk(chunk_coords: Vector2i):
@@ -148,11 +150,7 @@ func generate_chunk(chunk_coords: Vector2i):
 				elif f < 0.80:
 					subtropical_tile = TILE_ROCKY_DESERT
 				elif f < 0.88:
-					var salt_cluster = feature_noise.get_noise_2d(float(x) * 0.02, float(y) * 0.02) * 0.5 + 0.5
-					if salt_cluster > 0.15:
-						subtropical_tile = TILE_SALT_FLATS
-					else:
-						subtropical_tile = TILE_DESERT_SAND
+					subtropical_tile = TILE_DESERT_SAND
 				elif f < 0.98:
 					subtropical_tile = TILE_DRY_RIVERBED
 				else:
@@ -210,11 +208,7 @@ func generate_chunk(chunk_coords: Vector2i):
 					elif f < 0.80:
 						tile = TILE_ROCKY_DESERT
 					elif f < 0.88:
-						var salt_cluster = feature_noise.get_noise_2d(float(x) * 0.02, float(y) * 0.02) * 0.5 + 0.5
-						if salt_cluster > 0.15:
-							tile = TILE_SALT_FLATS
-						else:
-							tile = TILE_DESERT_SAND
+						tile = TILE_DESERT_SAND
 					elif f < 0.98:
 						tile = TILE_DRY_RIVERBED
 					else:
@@ -331,6 +325,18 @@ func generate_chunk(chunk_coords: Vector2i):
 			main.add_child(campfire)
 		main.unloaded_campfires.erase(chunk_coords)
 
+	# --- RESTORE GOATS ---
+	if main.unloaded_goats and main.unloaded_goats.has(chunk_coords):
+		for goat_data in main.unloaded_goats[chunk_coords]:
+			var goat = main.goat_scene.instantiate()
+			goat.position = goat_data["position"]
+			goat.demonic = goat_data.get("demonic", false)
+			goat.demonic_timer = goat_data.get("demonic_timer", 0.0)
+			goat.add_to_group("goats")
+			main.add_child(goat)
+			main.goats.append(goat)
+		main.unloaded_goats.erase(chunk_coords)
+
 # Helper function to flow river downhill
 func _generate_river_from(start_pos: Vector2i, elevation_map, tile_map):
 	var pos = start_pos
@@ -388,7 +394,28 @@ func unload_chunk(chunk_coords: Vector2i):
 			main.unloaded_campfires[chunk_coords].append(campfire.position)
 			campfire.queue_free()
 
+	# --- UNLOAD GOATS ---
+	for goat in main.get_tree().get_nodes_in_group("goats").duplicate():
+		var goat_tile = local_to_map(goat.position)
+		var goat_chunk = Vector2i(floor(goat_tile.x / chunk_size), floor(goat_tile.y / chunk_size))
+		if goat_chunk == chunk_coords:
+			if not main.unloaded_goats:
+				main.unloaded_goats = {}
+			if not main.unloaded_goats.has(chunk_coords):
+				main.unloaded_goats[chunk_coords] = []
+			# Save position and demonic status
+			main.unloaded_goats[chunk_coords].append({
+				"position": goat.position,
+				"demonic": goat.demonic,
+				"demonic_timer": goat.demonic_timer
+			})
+			goat.get_parent().remove_child(goat)
+			goat.queue_free()
+			if main.goats.has(goat):
+				main.goats.erase(goat)
+
 	# After removing pigs, check if we need to spawn more
 	if main and main.has_method("spawn_pigs_on_grass"):
 		if main.pigs.size() < 10: # or whatever your minimum is
-			main.spawn_pigs_on_grass(10)
+			pass
+			#main.spawn_pigs_on_grass(10)
