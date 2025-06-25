@@ -1,4 +1,4 @@
-[gd_resource type="TileSet" load_steps=47 format=3 uid="uid://ddrgf4g0fv8o"]
+[gd_resource type="TileSet" load_steps=51 format=3 uid="uid://ddrgf4g0fv8o"]
 
 [ext_resource type="Texture2D" uid="uid://rnc81y6nljnk" path="res://tiles/png/forest.png" id="1_nfvoa"]
 [ext_resource type="Texture2D" uid="uid://d4k3r8plw7rae" path="res://tiles/png/wetland.png" id="2_2xwus"]
@@ -18,6 +18,8 @@
 [ext_resource type="Texture2D" uid="uid://oajs7smq7eeu" path="res://tiles/png/dryriverbed.png" id="9_8sy4s"]
 [ext_resource type="Texture2D" uid="uid://byj6ae02jkxv1" path="res://tiles/png/oasis.png" id="10_5q2na"]
 [ext_resource type="Texture2D" uid="uid://b68iosknf7et3" path="res://tiles/png/water.png" id="10_wxjun"]
+[ext_resource type="Texture2D" uid="uid://ck5ulxb044lq1" path="res://tiles/png/savanatree.png" id="11_7ilic"]
+[ext_resource type="Texture2D" uid="uid://dn6p3e3qtnvgk" path="res://tiles/png/shrubland.png" id="12_tgjlj"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_2xwus"]
 vertices = PackedVector2Array(32, 32, -32, 32, -32, -32, 32, -32)
@@ -112,6 +114,16 @@ texture = ExtResource("10_5q2na")
 texture_region_size = Vector2i(64, 64)
 0:0/0 = 0
 
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_3dkg7"]
+texture = ExtResource("11_7ilic")
+texture_region_size = Vector2i(64, 64)
+0:0/0 = 0
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_a61ma"]
+texture = ExtResource("12_tgjlj")
+texture_region_size = Vector2i(64, 64)
+0:0/0 = 0
+
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_nfvoa"]
 vertices = PackedVector2Array(32, 32, -32, 32, -32, -32, 32, -32)
 polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3)])
@@ -201,3 +213,5 @@ sources/14 = SubResource("TileSetAtlasSource_t2n2f")
 sources/15 = SubResource("TileSetAtlasSource_07kbh")
 sources/16 = SubResource("TileSetAtlasSource_e6ekg")
 sources/17 = SubResource("TileSetAtlasSource_4utyb")
+sources/18 = SubResource("TileSetAtlasSource_3dkg7")
+sources/19 = SubResource("TileSetAtlasSource_a61ma")

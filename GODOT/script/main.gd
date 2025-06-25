@@ -55,8 +55,13 @@ var selected_recipe_index := 0
 var selected_inventory_index := 0
 var ui_focus := "inventory" # or "crafting_book"
 
+var step_sound := preload("res://assets/step.mp3")
+var prev_player_pos = null
+var step_player = null
+var ui_sound := preload("res://assets/ui_click.mp3")
+var ui_player = null
 
-
+var is_game_over := false # <-- Add this line
 
 #---- START GAME -----
 func _ready():
@@ -80,8 +85,21 @@ func _ready():
 	spawn_pigs_on_grass(20)
 	spawn_goats_on_mountains(10)
 	var fog_tilemap = $NavigationRegion2D/FogTileMap
+
+	# Add AudioStreamPlayer for UI sound
+	ui_player = AudioStreamPlayer.new()
+	ui_player.stream = ui_sound
+	ui_player.volume_db = -20 # Higher volume for UI click sound
+	ui_player.bus = "Master"
+	add_child(ui_player)
 	
-	
+	# Connect UI button signals to play sound
+	if $UI.has_node("HarvestButton"):
+		$UI/HarvestButton.pressed.connect(play_ui_sound)
+	if $UI.has_node("InventoryButton"):
+		$UI/InventoryButton.pressed.connect(play_ui_sound)
+	if $UI.has_node("CraftingBookButton"):
+		$UI/CraftingBookButton.pressed.connect(play_ui_sound)
 #---- PROCESS FUNCTION ---
 
 func _process(delta):
@@ -95,6 +113,7 @@ func _process(delta):
 	var tile_type = tilemap.get_cell_source_id(0, player_tile)
 	if player :
 		update_fog_of_war()
+	print(player_tile)
 	# TIME RELATED 
 		# Advance time
 	time_of_day += delta / SECONDS_PER_HOUR
@@ -132,7 +151,10 @@ func _process(delta):
 		var forest_darkness = int(210 * (forest_count / total_tiles))
 		night_strength = min(night_strength + forest_darkness, 255)
 		#NIGHT + FOREST DARKNESS
-	overlay.color.a = night_strength / 255.0
+	if player_tile.x > WORLD_MAX - 50 or player_tile.x < WORLD_MIN +50 or player_tile.y > WORLD_MAX -50 or player_tile.y < WORLD_MIN + 50:
+		overlay.color.a = 1
+	else :
+		overlay.color.a = night_strength / 255.0
 	#ACTION
 		# HARVEST ON FOREST 
 	$UI/HarvestButton.visible = (tile_type == TILE_FOREST or tile_type == TILE_SALTFLATS)
@@ -268,9 +290,15 @@ func _process(delta):
 
 #----------------- GAME OVER ---------------------------
 func game_over():
+	is_game_over = true # <-- Add this line
 	get_tree().paused = false  # Pause the game
 	self.hide() # Optionally hide the main node to prevent further processing
+	# Remove any existing GameOverScreen nodes before adding a new one
+	for child in get_tree().get_root().get_children():
+		if (child.name == "GameOverScreen") or ("CanvasLayer" in child.get_class() and child.has_method("get_scene_file_path") and child.get_scene_file_path() == "res://scenes/GameOverScreen.tscn"):
+			child.queue_free()
 	var game_over_scene = load("res://scenes/GameOverScreen.tscn").instantiate()
+	game_over_scene.name = "GameOverScreen"
 	get_tree().get_root().add_child(game_over_scene)
 
 
@@ -426,6 +454,10 @@ func craft_item(recipe_name):
 
 func place_object_on_tile(item_name, tile):
 	var tilemap = $NavigationRegion2D/TileMap
+	# Prevent placement near world edge
+	if tile.x > WORLD_MAX - 50 or tile.x < WORLD_MIN + 50 or tile.y > WORLD_MAX - 50 or tile.y < WORLD_MIN + 50:
+		return # Do not place anything near the edge
+	# ...existing code...
 	if item_name == "campfire":
 		var campfire_scene = preload("res://scenes/Campfire.tscn")
 		var campfire = campfire_scene.instantiate()
@@ -471,20 +503,30 @@ func update_fog_of_war():
 	var player_tile = tilemap.local_to_map(player.position)
 	var fov_tiles = compute_fov(tilemap, player_tile, 32.9, is_blocker)
 
-
 	# 1. Cover all loaded chunk tiles with fog
 	for chunk_coords in tilemap.active_chunks.keys():
 		var start_x = chunk_coords.x * tilemap.chunk_size
 		var start_y = chunk_coords.y * tilemap.chunk_size
 		for x in range(start_x, start_x + tilemap.chunk_size):
 			for y in range(start_y, start_y + tilemap.chunk_size):
+				# Don't overwrite edge fog
+				if (
+					x < tilemap.WORLD_MIN + 50 or x > tilemap.WORLD_MAX - 50 or
+					y < tilemap.WORLD_MIN + 50 or y > tilemap.WORLD_MAX - 50
+				):
+					continue
 				fog_tilemap.set_cell(0, Vector2i(x, y), 1, Vector2i(0, 0), 0)
 
 	# 2. Remove fog for visible tiles
 	for pos in fov_tiles.keys():
+		if (
+			pos.x < tilemap.WORLD_MIN + 50 or pos.x > tilemap.WORLD_MAX - 50 or
+			pos.y < tilemap.WORLD_MIN + 50 or pos.y > tilemap.WORLD_MAX - 50
+		):
+			continue # Never clear edge fog
 		fog_tilemap.set_cell(0, pos, -1) # -1 removes the fog tile
-	
-	 # 3. Remove fog around each campfire
+
+	# 3. Remove fog around each campfire
 	var campfire_radius = 8 # Adjust as needed
 	for campfire in get_tree().get_nodes_in_group("campfires"):
 		var campfire_tile = tilemap.local_to_map(campfire.position)
@@ -492,9 +534,13 @@ func update_fog_of_war():
 		var olive_radius_y = 6  # vertical radius (narrower)
 		for dx in range(-olive_radius_x, olive_radius_x + 1):
 			for dy in range(-olive_radius_y, olive_radius_y + 1):
-				# Ellipse equation: (x/a)^2 + (y/b)^2 <= 1
 				if (pow(dx / float(olive_radius_x), 2) + pow(dy / float(olive_radius_y), 2)) <= 1.0:
 					var pos = campfire_tile + Vector2i(dx, dy)
+					if (
+						pos.x < tilemap.WORLD_MIN + 50 or pos.x > tilemap.WORLD_MAX - 50 or
+						pos.y < tilemap.WORLD_MIN + 50 or pos.y > tilemap.WORLD_MAX - 50
+					):
+						continue # Never clear edge fog
 					fog_tilemap.set_cell(0, pos, -1)
 
 func is_blocker(tilemap, pos):
@@ -510,9 +556,9 @@ func find_valid_spawn_tile(tilemap):
 		var y = 0
 		# Pick a y in the grass biome bands
 		if randi() % 2 == 0:
-			y = randi_range(0, 1500)
+			y = randi_range(500, 500)
 		else:
-			y = randi_range(-1500, 0)
+			y = randi_range(-500, -500)
 		var x = randi_range(WORLD_MIN, WORLD_MAX)
 		var chunk_size = tilemap.chunk_size
 		var chunk_coords = Vector2i(floor(x / chunk_size), floor(y / chunk_size))
@@ -520,7 +566,7 @@ func find_valid_spawn_tile(tilemap):
 			tilemap.generate_chunk(chunk_coords)
 		var tile_type = tilemap.get_cell_source_id(0, Vector2i(x, y))
 		if tile_type != TILE_MOUNTAIN :
-			return Vector2i(x, y)
+			return Vector2i(0,3250 )
 		tries += 1
 	# fallback if not founds
 	print("fallback position")
@@ -531,9 +577,9 @@ func spawn_pigs_on_grass(count: int):
 	var spawned = 0
 	var tries = 0
 	var min_distance = 50 # in tiles
-
 	var chunk_size = tilemap.chunk_size
 	var loaded_chunks = tilemap.active_chunks.keys() # Or adjust if it's an array
+	var player_tile = tilemap.local_to_map(player.position)
 
 	while spawned < count and tries < count * 50:
 		# Pick a random loaded chunk
@@ -545,16 +591,21 @@ func spawn_pigs_on_grass(count: int):
 		var x = start_x + randi() % chunk_size
 		var y = start_y + randi() % chunk_size
 		var tile_pos = Vector2i(x, y)
+		# Prevent spawn near world edge
+		if x > WORLD_MAX - 50 or x < WORLD_MIN + 50 or y > WORLD_MAX - 50 or y < WORLD_MIN + 50:
+			tries += 1
+			continue
 		var tile_type = tilemap.get_cell_source_id(0, tile_pos)
 
-		# Check grass and distance to other pigs
+		# Check grass and distance to other pigs and player
 		var too_close = false
 		for pig in pigs:
 			var pig_tile = tilemap.local_to_map(pig.position)
 			if pig_tile.distance_to(tile_pos) < min_distance:
 				too_close = true
 				break
-
+		if player_tile.distance_to(tile_pos) < 15:
+			too_close = true
 		if tile_type == TILE_GRASS and not too_close:
 			var pig = pig_scene.instantiate()
 			pig.name = "Pig"
@@ -565,6 +616,7 @@ func spawn_pigs_on_grass(count: int):
 			pigs.append(pig)
 			spawned += 1
 		tries += 1
+
 # GOAT 
 func spawn_goats_on_mountains(count: int):
 	var tilemap = $NavigationRegion2D/TileMap
@@ -572,15 +624,31 @@ func spawn_goats_on_mountains(count: int):
 	var tries = 0
 	var chunk_size = tilemap.chunk_size
 	var loaded_chunks = tilemap.active_chunks.keys()
-	while spawned < count and tries < count * 50:
+	var player_tile = tilemap.local_to_map(player.position)
+	var min_goat_distance = 50 # Minimum distance between goats (in tiles)
+	var min_player_distance = 50 # Minimum distance from player (in tiles)
+	while spawned < count and tries < count * 100:
 		var chunk_coords = loaded_chunks[randi() % loaded_chunks.size()]
 		var start_x = chunk_coords.x * chunk_size
 		var start_y = chunk_coords.y * chunk_size
 		var x = start_x + randi() % chunk_size
 		var y = start_y + randi() % chunk_size
 		var tile_pos = Vector2i(x, y)
+		# Prevent spawn near world edge
+		if x > WORLD_MAX - 50 or x < WORLD_MIN + 50 or y > WORLD_MAX - 50 or y < WORLD_MIN + 50:
+			tries += 1
+			continue
 		var tile_type = tilemap.get_cell_source_id(0, tile_pos)
-		if tile_type == TILE_MOUNTAIN:
+		# Enforce minimum distance to all existing goats and player
+		var too_close = false
+		for goat in goats:
+			var goat_tile = tilemap.local_to_map(goat.position)
+			if goat_tile.distance_to(tile_pos) < min_goat_distance:
+				too_close = true
+				break
+		if player_tile.distance_to(tile_pos) < min_player_distance:
+			too_close = true
+		if tile_type == TILE_MOUNTAIN and not too_close:
 			var goat = goat_scene.instantiate()
 			goat.position = tilemap.map_to_local(tile_pos)
 			goat.add_to_group("goats")
@@ -706,16 +774,23 @@ func _input(event):
 	if event.is_action_pressed("build"):
 		_on_crafting_book_button_pressed()
 
+func play_ui_sound():
+	if ui_player:
+		ui_player.play()
+
 func _on_crafting_book_button_pressed() -> void:
+	play_ui_sound()
 	$UI/CraftingBookWindow.visible = not $UI/CraftingBookWindow.visible
 	if $UI/CraftingBookWindow.visible:
 		selected_recipe_index = 0
 		update_crafting_book()
 
 func _on_inventory_button_pressed() -> void:
+	play_ui_sound()
 	$UI/InventoryWindow.visible = not $UI/InventoryWindow.visible
 
 func _on_harvest_button_pressed() -> void:
+	play_ui_sound()
 	var tilemap = $NavigationRegion2D/TileMap
 	var player_tile = tilemap.local_to_map(player.position)
 	var tile_type = tilemap.get_cell_source_id(0, player_tile)
@@ -799,3 +874,15 @@ func _on_harvest_button_pressed() -> void:
 			forest_harvest_counts.erase(player_tile)
 	update_inventory_ui()
 	update_crafting_book()
+	# Play step sound if player is moving
+	if prev_player_pos != null and player.position != prev_player_pos:
+		if not step_player.playing:
+			step_player.play()
+	else:
+		if step_player.playing:
+			step_player.stop()
+	prev_player_pos = player.position
+func _on_step_player_finished():
+	# Only loop if player is still moving
+	if player and player.position != prev_player_pos:
+		step_player.play()

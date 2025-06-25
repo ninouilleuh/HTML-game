@@ -11,3 +11,4 @@ texture = ExtResource("1_3vyb7")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 zoom = Vector2(0.2, 0.2)
+limit_smoothed = true

@@ -3,7 +3,7 @@ extends CharacterBody2D
 var chunk_coords = Vector2i.ZERO
 var tile_size := 64.0
 var chase_distance := tile_size * 10 # 10 tiles
-var speed := 850
+var speed := 850 # Slower pig speed
 var chase_speed := speed          # Pig movement speed in pixels/sec
 var player = null           # Reference to player node
 var tilemap = null
@@ -26,8 +26,8 @@ var is_afraid := false
 var fear_timer := 0.0
 const FEAR_SHAKE_DURATION := 0.7 # seconds to shake before running
 var chase_accel := 0.0
-const CHASE_ACCEL_RATE := 1200.0 # pixels/sec^2, tweak as needed
-const CHASE_MIN_SPEED := 250.0   # starting chase speed, tweak as needed
+const CHASE_ACCEL_RATE := 1200.0 # Slower acceleration
+const CHASE_MIN_SPEED := 500.0   # Lower starting chase speed
 var is_wandering := false
 var wander_timer := 0.0
 var wander_pause_timer := 0.0
@@ -43,7 +43,8 @@ var savior_target = null
 var savior_timer := 0.0
 var is_crossing_forest := false
 var is_following_saviors := false
-var current_hour = null
+var current_hour = 6 # Default to 6 (morning) to avoid Nil errors
+var last_path_player_pos := Vector2.ZERO # Track last player pos for repath
 func _ready():
 	add_to_group("pigs")
 	# Find the player node (adjust path if needed)
@@ -54,11 +55,15 @@ func _ready():
 	main = get_tree().get_root().get_node("Main")
 
 func _process(delta):
-	
-	if main :
+	# Only non-movement logic here (timers, state, etc)
+	if main:
 		current_hour = int(main.time_of_day)
 	repath_timer -= delta
+	# Do NOT call move_and_slide() here anymore
 
+func _physics_process(delta):
+	if not is_instance_valid(player) or not is_instance_valid(navigation):
+		return
 	if player and navigation:
 		var dist = position.distance_to(player.position)
 
@@ -103,14 +108,20 @@ func _process(delta):
 				repath_timer = REPTH_INTERVAL
 
 			var target_direction := Vector2.ZERO
+			var dist_to_player = position.distance_to(player.position)
 
 			if path.size() > 1 and path_index < path.size():
 				var next_point = path[path_index]
-				if position.distance_to(next_point) < 4.0:
+				# Increase threshold for advancing to next path point for smoothness at high speed
+				if position.distance_to(next_point) < 32.0:
 					if path_index < path.size() - 1:
 						path_index += 1
 				if path_index < path.size():
-					target_direction = (path[path_index] - position).normalized()
+					# If close to player, always target player directly for max speed
+					if dist_to_player < 32.0:
+						target_direction = (player.position - position).normalized()
+					else:
+						target_direction = (path[path_index] - position).normalized()
 				else:
 					target_direction = (player.position - position).normalized()
 			else:
@@ -127,7 +138,10 @@ func _process(delta):
 			else:
 				chase_speed = chase_accel
 
-			velocity = target_direction * chase_speed
+			# --- CHASING: DIRECT velocity for consistent speed ---
+			# Always use normalized direction for full speed, even when close
+			var target_velocity = target_direction.normalized() * chase_speed
+			velocity = target_velocity
 			move_and_slide()
 		elif is_searching:
 
@@ -252,9 +266,10 @@ func _process(delta):
 					if found_dir:
 						wander_timer = WANDER_DURATION
 					else:
-						# No valid direction found, stand still and try again next frame
+						# No valid direction found, pause for a bit before trying again
 						wander_dir = Vector2.ZERO
 						wander_timer = 0.0
+						wander_pause_timer = WANDER_PAUSE # Add a pause instead of stopping instantly
 						velocity = Vector2.ZERO
 						move_and_slide()
 						return
@@ -265,31 +280,41 @@ func _process(delta):
 					wander_dir = Vector2.ZERO
 			move_and_slide()
 	# Night: wander (19h to 6h)
-	if (current_hour >= 19 or current_hour < 6) and not is_chasing and not is_searching and not is_afraid:
-		is_wandering = true
+	if current_hour != null:
+		if (current_hour >= 19 or current_hour < 6) and not is_chasing and not is_searching and not is_afraid:
+			is_wandering = true
 
-		# Savior logic should only run at night while wandering
-		if main and not is_savior and is_wandering and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
-			for pig in get_tree().get_nodes_in_group("pigs"):
-				if pig == self or not pig.is_afraid:
-					continue
-				# Count current saviors for this pig
-				var savior_count = 0
-				for other in get_tree().get_nodes_in_group("pigs"):
-					if other.is_savior and other.savior_target == pig:
-						savior_count += 1
-				if savior_count < 3 and position.distance_to(pig.position) < tile_size * 64: # Big radius
-					is_savior = true
-					savior_target = pig
-					pig.is_being_saved = true
-					$CollisionShape2D.disabled = true # <-- Désactive la collision
-					break
-	elif current_hour >= 6 and current_hour < 19:
-		is_wandering = false
-		velocity = Vector2.ZERO
+			# Savior logic should only run at night while wandering
+			if main and not is_savior and is_wandering and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
+				for pig in get_tree().get_nodes_in_group("pigs"):
+					if pig == self or not pig.is_afraid:
+						continue
+					# Count current saviors for this pig
+					var savior_count = 0
+					for other in get_tree().get_nodes_in_group("pigs"):
+						if other.is_savior and other.savior_target == pig:
+							savior_count += 1
+					if savior_count < 3 and position.distance_to(pig.position) < tile_size * 64: # Big radius
+						is_savior = true
+						savior_target = pig
+						pig.is_being_saved = true
+						$CollisionShape2D.disabled = true # <-- Désactive la collision
+						break
+		elif current_hour >= 6 and current_hour < 19:
+			is_wandering = false
+			velocity = Vector2.ZERO
 
-	if player and position.distance_to(player.position) < 20.0:
-		get_tree().get_root().get_node("Main").game_over()
+	if player and is_instance_valid(player) and position.distance_to(player.position) < 20.0:
+		var main = get_node("/root/Main") if has_node("/root/Main") else null
+		if main and is_instance_valid(main) and main.has_method("game_over"):
+			self.queue_free()
+			main.game_over()
+		else:
+			var game_over_scene = preload("res://scenes/GameOverScreen.tscn")
+			if game_over_scene:
+				get_tree().change_scene_to_file("res://scenes/GameOverScreen.tscn")
+			else:
+				print("[PIG DEBUG] GameOverScreen.tscn not found at res://scenes/GameOverScreen.tscn!")
 
 	if main :# If not already a savior/scared and not in forest and is wandering
 		if not is_savior and is_wandering and not is_afraid and not is_being_saved and tilemap.get_cell_source_id(0, tilemap.local_to_map(position)) != forest_tile_id:
@@ -476,7 +501,7 @@ func get_closest_pig():
 	var closest_pig = null
 	var closest_dist = INF
 	for pig in get_tree().get_nodes_in_group("pigs"):
-		if pig == self:
+		if pig == self or not is_instance_valid(pig):
 			continue
 		var d = position.distance_to(pig.position)
 		if d < closest_dist:

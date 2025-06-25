@@ -22,6 +22,9 @@ var demonic_pending_timer := 0.0
 var demonic_pending_wait := 10.0 # seconds to wait before turning demonic
 var demonic_duration := 300.0 # 5 minutes in seconds
 var demonic_timer := 0.0
+var transform_player = null
+var transform_sound := preload("res://assets/goat_transform.mp3")
+var played_transform_sound := false
 
 
 func _ready():
@@ -40,6 +43,13 @@ func _ready():
 		print("[GOAT DEBUG] Player node NOT found at /root/Main/player!")
 	move_timer = move_delay * randf() # randomize initial timer
 	demonic_origin = position
+
+	# Add AudioStreamPlayer for transformation sound
+	transform_player = AudioStreamPlayer.new()
+	transform_player.stream = transform_sound
+	transform_player.volume_db = 6 # Louder than default
+	transform_player.bus = "Master"
+	add_child(transform_player)
 
 func _process(delta):
 	# Use absolute paths from the scene root
@@ -63,6 +73,18 @@ func _process(delta):
 	if demonic_pending:
 		demonic_pending_timer += delta
 		moving = false
+		# Play transformation sound once at start of pending
+		if not played_transform_sound:
+			transform_player.play()
+			played_transform_sound = true
+		# Fade sound based on player distance
+		if player:
+			var dist = position.distance_to(player.position)
+			var max_dist = 2000.0 # pixels, increased for greater audible range
+			var min_db = -40.0 # silence
+			var max_db = 6.0 # loudest
+			var t = clamp(1.0 - (dist / max_dist), 0.0, 1.0)
+			transform_player.volume_db = lerp(min_db, max_db, t)
 		# Always squished while pending
 		if has_node("Sprite2D"):
 			$Sprite2D.scale.y = 0.5
@@ -79,6 +101,8 @@ func _process(delta):
 			has_chased = false # Reset so it can't re-enter pending
 			demonic_pending_timer = 0.0
 			demonic_timer = 0.0 # <-- Reset timer here
+			played_transform_sound = false # Reset for next time
+			transform_player.stop() # Stop sound at end of pending
 			print("[GOAT DEBUG] Demonic transformation complete at position %s" % str(position))
 			return
 		return
