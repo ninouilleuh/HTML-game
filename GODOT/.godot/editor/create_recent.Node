@@ -1,3 +1,5 @@
+HBoxContainer
+TextureRect
 Label
 Panel
 CanvasLayer
@@ -11,4 +13,3 @@ StaticBody2D
 Node2D
 PointLight2D
 VBoxContainer
-Button

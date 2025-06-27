@@ -8,12 +8,7 @@ var day := 1
 const HOURS_PER_DAY := 24
 const SECONDS_PER_HOUR := 60.0 # 1 hour = 1 minute real time
 # Dictionaries
-var inventory = {
-	"stick": 0,
-	"big_stick": 0,
-	"campfire": 0,
-	"wall": 0,
-	"salt": 0
+var inventory = {"stick" : 0, "big_stick":0
 }
 var item_icons = {
 	"stick": preload("res://assets/stick.png"),
@@ -24,8 +19,22 @@ var item_icons = {
 }
 var recipes = {
 	"campfire": ["stick", "stick", "stick"],
-	"wall": ["big_stick"],# "big_stick", "big_stick", "big_stick", "big_stick"],
-	"big_stick": ["stick","stick","stick","stick","stick","stick"]
+	"wall": ["big_stick","big_stick","big_stick","big_stick"],
+	"big_stick": ["stick","stick","stick","stick","stick","stick"],
+	"crafting_table" : ["big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick","big_stick", "reed","reed","reed","reed","reed","reed","reed","reed","reed","reed"], #50, 10
+	
+	"axe" : ["big_stick","big_stick"], #need crafting table
+	"rope" : ["reed"], #need crafting table
+	"carpet" : ["reed", "leather"], #need crafting table
+	"door" : ["reed"], #need crafting table 
+	"trap" :  ["reed"], #need crafting table 
+	"shovel" :  ["reed"], #need crafting table 
+	"cauldron" :  ["iron"], #need crafting table 
+	"knife" :  ["iron"], #need crafting table
+	"whistle" :  ["iron"], #need crafting table
+	"hat" : ["leather"], #need crafting table
+	"gloves" : ["leather"], #need crafting table
+	"scarecrow" : ["leather"], #need crafting table
 }
 var unloaded_pigs := {} # Key: chunk_coords, Value: Array of pig data (e.g., positions)
 var unloaded_campfires := {} # Key: chunk_coords, Value: Array of campfire data (e.g., positions)
@@ -62,6 +71,12 @@ var ui_sound := preload("res://assets/ui_click.mp3")
 var ui_player = null
 
 var is_game_over := false # <-- Add this line
+
+# Add a reference to the quick bar container
+var quick_bar_container = null
+
+# Track the order in which items are acquired
+var inventory_order := []
 
 #---- START GAME -----
 func _ready():
@@ -100,20 +115,26 @@ func _ready():
 		$UI/InventoryButton.pressed.connect(play_ui_sound)
 	if $UI.has_node("CraftingBookButton"):
 		$UI/CraftingBookButton.pressed.connect(play_ui_sound)
+	# Add QuickBar UI if not present
+		quick_bar_container = $UI/QuickBar
+		quick_bar_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		quick_bar_container.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	update_quick_bar()
 #---- PROCESS FUNCTION ---
 
 func _process(delta):
-		#MAP RELATED 
-		# After player moves, update visible chunks
+	#MAP RELATED 
+	# After player moves, update visible chunks
 	$NavigationRegion2D/TileMap.update_visible_chunks(player.position)
-	
-		# Get the player's current tile and tile_type FIRST
+	# Only update quick bar here (not inventory UI)
+	update_quick_bar()
+	# Get the player's current tile and tile_type FIRST
 	var tilemap = $NavigationRegion2D/TileMap
 	var player_tile = tilemap.local_to_map(player.position)
 	var tile_type = tilemap.get_cell_source_id(0, player_tile)
 	if player :
 		update_fog_of_war()
-	print(player_tile)
+
 	# TIME RELATED 
 		# Advance time
 	time_of_day += delta / SECONDS_PER_HOUR
@@ -386,15 +407,32 @@ func update_inventory_ui():
 	for child in slot_container.get_children():
 		child.queue_free()
 
+	# Remove items with 0 count from inventory_order
+	for i in range(inventory_order.size() - 1, -1, -1):
+		var item_name = inventory_order[i]
+		if not inventory.has(item_name) or inventory[item_name] <= 0:
+			inventory_order.remove_at(i)
+
+	# Build items list in acquisition order
 	var items = []
+	for item_name in inventory_order:
+		if inventory.has(item_name) and inventory[item_name] > 0:
+			items.append(item_name)
+	# Add any new items not yet in inventory_order
 	for item_name in inventory.keys():
-		if inventory[item_name] > 0:
+		if inventory[item_name] > 0 and not inventory_order.has(item_name):
+			inventory_order.append(item_name)
 			items.append(item_name)
 
-	var total_slots = max(2, items.size()) # Always show at least 2 slots
+	slot_container.set("custom_constants/vseparation", 12) # Add vertical margin between rows
+
+	var total_slots = max(20, items.size()) # Always show at least 5 slots
 
 	for i in range(total_slots):
 		var slot = slot_scene.instantiate()
+		# Attach drag script
+		slot.inventory_index = i
+		slot.main_node = self
 		var texture_rect = slot.get_node("Control/TextureRect")
 		var label = slot.get_node("Control/Label")
 		var invname = slot.get_node("Control/Name")
@@ -420,18 +458,63 @@ func update_inventory_ui():
 
 			# Only connect for placeable items
 			if item_name == "campfire" or item_name == "wall":
+				var this_item = item_name # capture by value
 				texture_rect.gui_input.connect(func(event):
-					if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+					if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
 						is_placing = true
-						placing_item = item_name
+						placing_item = this_item
 						$UI/InventoryWindow.visible = false
 				)
 		else:
 			texture_rect.texture = null
 			label.text = ""
 			texture_rect.modulate = Color(0.2, 0.2, 0.2, 1) # faded/gray
-		
 		slot_container.add_child(slot)
+	update_quick_bar()
+
+func update_quick_bar():
+	if not quick_bar_container:
+		return
+	for child in quick_bar_container.get_children():
+		child.queue_free()
+	# Remove items with 0 count from inventory_order
+	for i in range(inventory_order.size() - 1, -1, -1):
+		var item_name = inventory_order[i]
+		if not inventory.has(item_name) or inventory[item_name] <= 0:
+			inventory_order.remove_at(i)
+	# Build items list in acquisition order
+	var items = []
+	for item_name in inventory_order:
+		if inventory.has(item_name) and inventory[item_name] > 0:
+			items.append(item_name)
+	# Add any new items not yet in inventory_order
+	for item_name in inventory.keys():
+		if inventory[item_name] > 0 and not inventory_order.has(item_name):
+			inventory_order.append(item_name)
+			items.append(item_name)
+	for i in range(5):
+		var slot = PanelContainer.new()
+		slot.custom_minimum_size = Vector2(64, 64)
+		var hbox = VBoxContainer.new()
+		hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		var icon = TextureRect.new()
+		icon.expand = true
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(48, 48)
+		var label = Label.new()
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		if i < items.size():
+			var item_name = items[i]
+			icon.texture = item_icons.get(item_name, null)
+			label.text = "%d" % [inventory[item_name]]
+		else:
+			icon.texture = null
+			label.text = ""
+		hbox.add_child(icon)
+		hbox.add_child(label)
+		slot.add_child(hbox)
+		quick_bar_container.add_child(slot)
 
 func can_craft(recipe_name):
 	var needed = recipes[recipe_name].duplicate()
@@ -451,13 +534,13 @@ func craft_item(recipe_name):
 	if not inventory.has(recipe_name):
 		inventory[recipe_name] = 0
 	inventory[recipe_name] += 1
+	update_quick_bar()
 
 func place_object_on_tile(item_name, tile):
 	var tilemap = $NavigationRegion2D/TileMap
 	# Prevent placement near world edge
 	if tile.x > WORLD_MAX - 50 or tile.x < WORLD_MIN + 50 or tile.y > WORLD_MAX - 50 or tile.y < WORLD_MIN + 50:
 		return # Do not place anything near the edge
-	# ...existing code...
 	if item_name == "campfire":
 		var campfire_scene = preload("res://scenes/Campfire.tscn")
 		var campfire = campfire_scene.instantiate()
@@ -480,6 +563,7 @@ func place_object_on_tile(item_name, tile):
 		print("TileSet has tile for ID 3:", tilemap.tile_set.get_source(TILE_WALL) != null)
 		inventory[item_name] -= 1
 		update_inventory_ui()
+	update_quick_bar()
 
 #-------------------- FOG OF WAR -----------------
 func compute_fov(tilemap: TileMap, origin: Vector2i, radius: int, is_blocker: Callable) -> Dictionary:
@@ -875,14 +959,22 @@ func _on_harvest_button_pressed() -> void:
 	update_inventory_ui()
 	update_crafting_book()
 	# Play step sound if player is moving
-	if prev_player_pos != null and player.position != prev_player_pos:
-		if not step_player.playing:
-			step_player.play()
-	else:
-		if step_player.playing:
-			step_player.stop()
-	prev_player_pos = player.position
 func _on_step_player_finished():
 	# Only loop if player is still moving
 	if player and player.position != prev_player_pos:
 		step_player.play()
+
+func swap_inventory_slots(from_index: int, to_index: int) -> void:
+	# Only swap if both indices are valid and not the same
+	if from_index == to_index:
+		return
+	if from_index < 0 or from_index >= inventory_order.size():
+		return
+	if to_index < 0 or to_index >= inventory_order.size():
+		return
+	# Swap the items in inventory_order using a temporary variable
+	var temp = inventory_order[from_index]
+	inventory_order[from_index] = inventory_order[to_index]
+	inventory_order[to_index] = temp
+	update_inventory_ui()
+	update_quick_bar()
