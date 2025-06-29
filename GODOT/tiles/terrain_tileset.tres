@@ -1,4 +1,4 @@
-[gd_resource type="TileSet" load_steps=51 format=3 uid="uid://ddrgf4g0fv8o"]
+[gd_resource type="TileSet" load_steps=53 format=3 uid="uid://ddrgf4g0fv8o"]
 
 [ext_resource type="Texture2D" uid="uid://rnc81y6nljnk" path="res://tiles/png/forest.png" id="1_nfvoa"]
 [ext_resource type="Texture2D" uid="uid://d4k3r8plw7rae" path="res://tiles/png/wetland.png" id="2_2xwus"]
@@ -20,6 +20,7 @@
 [ext_resource type="Texture2D" uid="uid://b68iosknf7et3" path="res://tiles/png/water.png" id="10_wxjun"]
 [ext_resource type="Texture2D" uid="uid://ck5ulxb044lq1" path="res://tiles/png/savanatree.png" id="11_7ilic"]
 [ext_resource type="Texture2D" uid="uid://dn6p3e3qtnvgk" path="res://tiles/png/shrubland.png" id="12_tgjlj"]
+[ext_resource type="Texture2D" uid="uid://bj5rk2lok2kwe" path="res://tiles/png/cave.png" id="14_tgjlj"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_2xwus"]
 vertices = PackedVector2Array(32, 32, -32, 32, -32, -32, 32, -32)
@@ -136,6 +137,11 @@ texture_region_size = Vector2i(64, 64)
 0:0/0 = 0
 0:0/0/navigation_layer_0/polygon = SubResource("NavigationPolygon_nfvoa")
 
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_u41wq"]
+texture = ExtResource("14_tgjlj")
+texture_region_size = Vector2i(64, 64)
+0:0/0 = 0
+
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_gtyl6"]
 vertices = PackedVector2Array(32, 32, -32, 32, -32, -32, 32, -32)
 polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3)])
@@ -215,3 +221,4 @@ sources/16 = SubResource("TileSetAtlasSource_e6ekg")
 sources/17 = SubResource("TileSetAtlasSource_4utyb")
 sources/18 = SubResource("TileSetAtlasSource_3dkg7")
 sources/19 = SubResource("TileSetAtlasSource_a61ma")
+sources/20 = SubResource("TileSetAtlasSource_u41wq")

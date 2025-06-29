@@ -8,14 +8,15 @@ var day := 1
 const HOURS_PER_DAY := 24
 const SECONDS_PER_HOUR := 60.0 # 1 hour = 1 minute real time
 # Dictionaries
-var inventory = {"stick" : 0, "big_stick":0
+var inventory = {"stick" : 0, "big_stick":0, "salt":0
 }
 var item_icons = {
 	"stick": preload("res://assets/stick.png"),
 	"big_stick": preload("res://assets/big_stick.png"),
 	"campfire": preload("res://assets/campfire.png"),
 	"wall": preload("res://assets/wall.png"),
-	#"salt": preload("res://tileset/saltflats.png")
+	"salt": preload("res://assets/salt.png"),
+	"leather": preload("res://assets/leather.png")
 }
 var recipes = {
 	"campfire": ["stick", "stick", "stick"],
@@ -48,15 +49,20 @@ var goat_scene = preload("res://scenes/goat.tscn")
 const TILE_FOREST = 0 
 const WORLD_MIN = -5000
 const WORLD_MAX = 5000
-const TILE_WALL = 11 # Set this to the correct tile ID for your wall
+var wall_scene = preload("res://scenes/wall.tscn")
 const TILE_MOUNTAIN = 5
 const TILE_GRASS = 2 # Use your actual grass tile ID
+# Cave entrance tile ID (choose a unique unused tile ID)
+const TILE_HILL = 8 # Set this to the correct tile ID for hill tiles
 const TILE_SALTFLATS = 15 # Set this to the correct tile ID for saltflats
+# Cave entrance tile ID (choose a unique unused tile ID)
+const TILE_CAVE_ENTRANCE = 20
 # GROUPS
 var pigs = []
 var goats = []
 var placed_campfires := [] # Array of Vector2i tile positions
-#OTHER
+
+# OTHER
 var is_placing := false
 var placing_item := ""
 var preview_sprite = null
@@ -64,10 +70,18 @@ var selected_recipe_index := 0
 var selected_inventory_index := 0
 var ui_focus := "inventory" # or "crafting_book"
 
-var step_sound := preload("res://assets/step.mp3")
+
+# DECONSTRUCTION MODE
+var is_deconstructing := false
+# Deconstruction selection system
+var deconstruct_candidates := [] # Array of {node, type, tile, pos}
+var deconstruct_selected_idx := 0
+var deconstruct_highlight = null
+
+var step_sound := preload("res://assets/sound/step.mp3")
 var prev_player_pos = null
 var step_player = null
-var ui_sound := preload("res://assets/ui_click.mp3")
+var ui_sound := preload("res://assets/sound/ui_click.mp3")
 var ui_player = null
 
 var is_game_over := false # <-- Add this line
@@ -80,7 +94,6 @@ var inventory_order := []
 
 #---- START GAME -----
 func _ready():
-	
 	# Instance the player scene
 	print("hello world")
 	var player_scene = preload("res://scenes/player.tscn")
@@ -93,21 +106,18 @@ func _ready():
 	# Place player 
 	var spawn_tile = find_valid_spawn_tile(tilemap)
 	player.position = tilemap.map_to_local(spawn_tile)
-	
 	load_game()
-	# Generate initial chunks around the player (must be after setting position!)
+	# Generate initial chunks around the player
 	tilemap.update_visible_chunks(player.position)
 	spawn_pigs_on_grass(20)
 	spawn_goats_on_mountains(10)
 	var fog_tilemap = $NavigationRegion2D/FogTileMap
-
 	# Add AudioStreamPlayer for UI sound
 	ui_player = AudioStreamPlayer.new()
 	ui_player.stream = ui_sound
 	ui_player.volume_db = -20 # Higher volume for UI click sound
 	ui_player.bus = "Master"
 	add_child(ui_player)
-	
 	# Connect UI button signals to play sound
 	if $UI.has_node("HarvestButton"):
 		$UI/HarvestButton.pressed.connect(play_ui_sound)
@@ -120,36 +130,119 @@ func _ready():
 		quick_bar_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		quick_bar_container.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	update_quick_bar()
+
+# --- CAVE ENTRANCE SPAWN LOGIC ---
+var placed_cave_count := 0
+var max_caves := 5
+var placed_cave_positions := []
+
+# Call this from chunk generation logic, passing the chunk_coords and tilemap
+func try_place_cave_in_chunk(tilemap, chunk_coords):
+	if placed_cave_count >= max_caves:
+		return
+	var chunk_size = tilemap.chunk_size
+	var start_x = chunk_coords.x * chunk_size
+	var start_y = chunk_coords.y * chunk_size
+	var possible_tiles = []
+	for x in range(start_x, start_x + chunk_size):
+		for y in range(start_y, start_y + chunk_size):
+			# Not near world edge
+			if x <= WORLD_MIN + 50 or x >= WORLD_MAX - 50 or y <= WORLD_MIN + 50 or y >= WORLD_MAX - 50:
+				continue
+			var tile_pos = Vector2i(x, y)
+			var tile_type = tilemap.get_cell_source_id(0, tile_pos)
+			if tile_type == TILE_MOUNTAIN and not tile_pos in placed_cave_positions:
+				# Check minimum distance to all existing caves
+				var too_close = false
+				for cave_pos in placed_cave_positions:
+					if tile_pos.distance_to(cave_pos) < 1000:
+						too_close = true
+						break
+				if too_close:
+					continue
+				# Check neighbors: must have at least 2 non-mountain neighbors
+				var non_mountain_neighbors = 0
+				for dx in range(-1, 2):
+					for dy in range(-1, 2):
+						if dx == 0 and dy == 0:
+							continue
+						var neighbor = tile_pos + Vector2i(dx, dy)
+						var neighbor_type = tilemap.get_cell_source_id(0, neighbor)
+						if neighbor_type != TILE_MOUNTAIN:
+							non_mountain_neighbors += 1
+				if non_mountain_neighbors >= 2:
+					possible_tiles.append(tile_pos)
+	# Only a small chance to place a cave in this chunk
+	var cave_chance = 50 # percent
+	var did_place = false
+	if possible_tiles.size() > 0:
+		var roll = randi() % 100
+		if roll < cave_chance:
+			var idx = randi() % possible_tiles.size()
+			var pos = possible_tiles[idx]
+			tilemap.set_cell(0, pos, TILE_CAVE_ENTRANCE, Vector2i(0, 0), 0)
+			tilemap.modified_tiles[pos] = TILE_CAVE_ENTRANCE
+			placed_cave_positions.append(pos)
+			placed_cave_count += 1
+			print("Cave entrance placed at tile coordinate ", pos, " (total: ", placed_cave_count, ") in chunk ", chunk_coords, ". Roll was ", roll, " < ", cave_chance)
+			did_place = true
+		else:
+			print("No cave placed in chunk ", chunk_coords, ". Roll was ", roll, " >= ", cave_chance, ". Possible tiles: ", possible_tiles.size())
+	else:
+		print("No cave placed in chunk ", chunk_coords, ". No possible mountain tiles with at least 2 non-mountain neighbors and 1000+ distance from other caves.")
+
+
 #---- PROCESS FUNCTION ---
 
 func _process(delta):
-	#MAP RELATED 
-	# After player moves, update visible chunks
-	$NavigationRegion2D/TileMap.update_visible_chunks(player.position)
-	# Only update quick bar here (not inventory UI)
-	update_quick_bar()
-	# Get the player's current tile and tile_type FIRST
+	# --- MAIN GAME PROCESS ---
+	var in_cave = has_node("caves")
+	$NavigationRegion2D/TileMap.visible = not in_cave
+	$NavigationRegion2D/FogTileMap.visible = not in_cave
+
+	# If in cave, skip all overworld logic (handled by caves.gd)
+	if in_cave:
+		return
+
+	# --- OVERWORLD LOGIC ---
 	var tilemap = $NavigationRegion2D/TileMap
 	var player_tile = tilemap.local_to_map(player.position)
 	var tile_type = tilemap.get_cell_source_id(0, player_tile)
-	if player :
+
+	tilemap.update_visible_chunks(player.position)
+	update_quick_bar()
+	if player:
 		update_fog_of_war()
 
-	# TIME RELATED 
-		# Advance time
+	# --- CAVE ENTRANCE HANDLING ---
+	if tile_type == TILE_CAVE_ENTRANCE and not has_node("caves"):
+		print("Entering cave at ", player_tile)
+		for pig in pigs:
+			pig.queue_free()
+		pigs.clear()
+		for goat in goats:
+			goat.queue_free()
+		goats.clear()
+		var caves_scene = preload("res://scenes/caves.tscn").instantiate()
+		caves_scene.name = "caves"
+		add_child(caves_scene)
+		if caves_scene.has_method("enter_cave"):
+			caves_scene.enter_cave(player)
+
+	# --- TIME ADVANCE ---
 	time_of_day += delta / SECONDS_PER_HOUR
 	if time_of_day >= HOURS_PER_DAY:
 		time_of_day -= HOURS_PER_DAY
 		day += 1
 		print("Day ", day, " begins!")
 
-		# Update time label
+	# Update time label
 	var hour = int(time_of_day)
 	var minute = int((time_of_day - hour) * 60)
 	var time_string = "%02d:%02d" % [hour, minute]
 	$UI/TimePanel/TimeLabel.text = time_string
-	
-		# fade to dark at NIGHT (between 18:00 and 6:00)
+
+	# --- NIGHT & FOREST DARKNESS ---
 	var overlay = $CanvasLayer/DayNightOverlay
 	var night_strength = 0
 	if time_of_day < 6.0:
@@ -159,7 +252,6 @@ func _process(delta):
 	else:
 		night_strength = 0
 
-		#FOREST DARKNESS
 	if tile_type == TILE_FOREST:
 		var forest_count = 0
 		var radius = 2
@@ -168,120 +260,146 @@ func _process(delta):
 				var check_tile = player_tile + Vector2i(dx, dy)
 				if tilemap.get_cell_source_id(0, check_tile) == TILE_FOREST:
 					forest_count += 1
-		var total_tiles = pow((radius * 2 + 1), 2) # 25 for 5x5
+		var total_tiles = pow((radius * 2 + 1), 2)
 		var forest_darkness = int(210 * (forest_count / total_tiles))
 		night_strength = min(night_strength + forest_darkness, 255)
-		#NIGHT + FOREST DARKNESS
-	if player_tile.x > WORLD_MAX - 50 or player_tile.x < WORLD_MIN +50 or player_tile.y > WORLD_MAX -50 or player_tile.y < WORLD_MIN + 50:
+
+	if player_tile.x > WORLD_MAX - 50 or player_tile.x < WORLD_MIN + 50 or player_tile.y > WORLD_MAX - 50 or player_tile.y < WORLD_MIN + 50:
 		overlay.color.a = 1
-	else :
+	else:
 		overlay.color.a = night_strength / 255.0
-	#ACTION
-		# HARVEST ON FOREST 
-	$UI/HarvestButton.visible = (tile_type == TILE_FOREST or tile_type == TILE_SALTFLATS)
-	if Input.is_action_just_pressed("action") and (tile_type == TILE_FOREST or tile_type == TILE_SALTFLATS) and not $UI/CraftingBookWindow.visible :
+
+	# --- HARVEST BUTTON ---
+	# Show harvest button if on forest, saltflats, or standing on a reed (AnimatedSprite2D with reed sprite_frames)
+	var on_reed = false
+	for child in tilemap.get_children():
+		if child is AnimatedSprite2D:
+			var reed_tile = tilemap.local_to_map(child.position)
+			if reed_tile == player_tile:
+				if child.sprite_frames and child.sprite_frames.resource_path.find("reed") != -1:
+					on_reed = true
+					break
+	$UI/HarvestButton.visible = (tile_type == TILE_FOREST or tile_type == TILE_SALTFLATS or on_reed)
+	if Input.is_action_just_released("action") and (tile_type == TILE_FOREST or tile_type == TILE_SALTFLATS or on_reed) and not $UI/CraftingBookWindow.visible:
 		_on_harvest_button_pressed()
-		# PLACING ITEM 
-	if Input.is_action_just_pressed("place") and placing_item != "":
+
+	# --- PLACING ITEM ---
+	if Input.is_action_just_released("place") and placing_item != "":
 		place_object_on_tile(placing_item, player_tile)
-		# Only stop placing if you run out of the item
 		if inventory[placing_item] <= 0:
 			is_placing = false
 			placing_item = ""
 			if preview_sprite:
 				preview_sprite.queue_free()
 				preview_sprite = null
-		# CRAFTING LOGIC FOCUS 
-	if $UI/CraftingBookWindow.visible and not $UI/InventoryWindow.visible:
-		var recipe_names = recipes.keys()
-		if Input.is_action_just_pressed("ui_up"):
+			update_mode_indicator() # Hide building mode label if no more item
+
+	# --- UI NAVIGATION & FOCUS LOGIC ---
+	var inventory_open = $UI/InventoryWindow.visible
+	var crafting_open = $UI/CraftingBookWindow.visible
+
+	# Deactivate deconstruction mode if inventory is opened
+	if inventory_open and is_deconstructing:
+		is_deconstructing = false
+		update_mode_indicator()
+
+	var items = []
+	for item_name in inventory.keys():
+		if inventory[item_name] > 0:
+			items.append(item_name)
+	var recipe_names = recipes.keys()
+
+	if crafting_open and not inventory_open:
+		# Crafting book navigation
+		if Input.is_action_just_released("ui_up"):
 			selected_recipe_index = max(0, selected_recipe_index - 1)
 			update_crafting_book()
-			
-		elif Input.is_action_just_pressed("ui_down"):
+		elif Input.is_action_just_released("ui_down"):
 			selected_recipe_index = min(recipe_names.size() - 1, selected_recipe_index + 1)
 			update_crafting_book()
-			
-		elif Input.is_action_just_pressed("action"):
+		elif Input.is_action_just_released("action"):
 			var selected_recipe = recipe_names[selected_recipe_index]
 			if can_craft(selected_recipe):
 				craft_item(selected_recipe)
 				update_inventory_ui()
 				update_crafting_book()
-		# INVENTORY LOGIC FOCUS
-	if $UI/InventoryWindow.visible and not  $UI/CraftingBookWindow.visible :
-		var items = []
-		for item_name in inventory.keys():
-			if inventory[item_name] > 0:
-				items.append(item_name)
-		if Input.is_action_just_pressed("ui_right"):
+
+	if inventory_open and not crafting_open:
+		# Inventory navigation
+		if Input.is_action_just_released("ui_right"):
 			selected_inventory_index = min(items.size() - 1, selected_inventory_index + 1)
 			update_inventory_ui()
-		elif Input.is_action_just_pressed("ui_left"):
+		elif Input.is_action_just_released("ui_left"):
 			selected_inventory_index = max(0, selected_inventory_index - 1)
 			update_inventory_ui()
-		elif Input.is_action_just_pressed("action"):
-			if items.size() > 0:
-				var item_name = items[selected_inventory_index]
+		elif Input.is_action_just_released("action"):
+			# Always recalculate the current items list in slot order
+			var current_items = []
+			for n in inventory_order:
+				if inventory.has(n) and inventory[n] > 0:
+					current_items.append(n)
+			for n in inventory.keys():
+				if inventory[n] > 0 and not inventory_order.has(n):
+					current_items.append(n)
+			if current_items.size() > 0 and selected_inventory_index < current_items.size():
+				var item_name = current_items[selected_inventory_index]
 				if item_name == "campfire" or item_name == "wall":
 					is_placing = true
 					placing_item = item_name
 					$UI/InventoryWindow.visible = false
-		# FOCUS SWITCH LOGIC 
-	if $UI/InventoryWindow.visible and $UI/CraftingBookWindow.visible:
-		var items = []
-		for item_name in inventory.keys():
-			if inventory[item_name] > 0:
-				items.append(item_name)
-		var recipe_names = recipes.keys()
+					update_mode_indicator() # Show building mode label immediately
 
+	elif inventory_open and crafting_open:
 		# Focus switching
-		if Input.is_action_just_pressed("ui_right") or Input.is_action_just_pressed("ui_left"):
+		if Input.is_action_just_released("ui_right") or Input.is_action_just_released("ui_left"):
 			ui_focus = "inventory"
 			update_inventory_ui()
 			update_crafting_book()
-		elif Input.is_action_just_pressed("ui_up") or Input.is_action_just_pressed("ui_down"):
+		elif Input.is_action_just_released("ui_up") or Input.is_action_just_released("ui_down"):
 			ui_focus = "crafting_book"
 			update_inventory_ui()
 			update_crafting_book()
 
-		# Inventory navigation and selection
+		# Only the focused panel handles navigation and action
 		if ui_focus == "inventory":
-			if Input.is_action_just_pressed("ui_right"):
+			if Input.is_action_just_released("ui_right"):
 				selected_inventory_index = min(items.size() - 1, selected_inventory_index + 1)
 				update_inventory_ui()
-			elif Input.is_action_just_pressed("ui_left"):
+			elif Input.is_action_just_released("ui_left"):
 				selected_inventory_index = max(0, selected_inventory_index - 1)
 				update_inventory_ui()
-			elif Input.is_action_just_pressed("action"):
-				if items.size() > 0:
-					var item_name = items[selected_inventory_index]
+			elif Input.is_action_just_released("action"):
+				# Always recalculate the current items list in slot order
+				var current_items = []
+				for n in inventory_order:
+					if inventory.has(n) and inventory[n] > 0:
+						current_items.append(n)
+				for n in inventory.keys():
+					if inventory[n] > 0 and not inventory_order.has(n):
+						current_items.append(n)
+				if current_items.size() > 0 and selected_inventory_index < current_items.size():
+					var item_name = current_items[selected_inventory_index]
 					if item_name == "campfire" or item_name == "wall":
 						is_placing = true
 						placing_item = item_name
 						$UI/InventoryWindow.visible = false
-
-		# Crafting book navigation and selection
+						update_mode_indicator() # Show building mode label immediately
 		elif ui_focus == "crafting_book":
-			if Input.is_action_just_pressed("ui_up"):
+			if Input.is_action_just_released("ui_up"):
 				selected_recipe_index = max(0, selected_recipe_index - 1)
 				update_crafting_book()
-			elif Input.is_action_just_pressed("ui_down"):
+			elif Input.is_action_just_released("ui_down"):
 				selected_recipe_index = min(recipe_names.size() - 1, selected_recipe_index + 1)
 				update_crafting_book()
-			elif Input.is_action_just_pressed("action"):
+			elif Input.is_action_just_released("action"):
 				var selected_recipe = recipe_names[selected_recipe_index]
 				if can_craft(selected_recipe):
 					craft_item(selected_recipe)
 					update_inventory_ui()
 					update_crafting_book()
-	
-	 # Gather campfire positions in screen UV (0-1) coordinates
-	
-	#CAMPFIRE SHADERS
+
+	# --- CAMPFIRE SHADER UPDATE ---
 	var camera = get_viewport().get_camera_2d()
-	var viewport_center = get_viewport().size * 0.5
-	# Use the width as the scaling reference (or use .y for height, or average both for diagonal)
 	var screen_scale = (get_viewport().size.x + get_viewport().size.y) / (1152.0 + 648.0)
 	var campfire_positions = []
 	var root = get_tree().root
@@ -303,8 +421,8 @@ func _process(delta):
 		mat.set_shader_parameter("CAMPFIRE_POSITIONS", campfire_positions)
 		mat.set_shader_parameter("viewport_size", get_viewport().size)
 		mat.set_shader_parameter("overlay_color", overlay.color)
-		mat.set_shader_parameter("radius", 160.0 * screen_scale)      # <-- Add this
-		mat.set_shader_parameter("softness", 48.0 * screen_scale)     # <-- And this
+		mat.set_shader_parameter("radius", 160.0 * screen_scale)
+		mat.set_shader_parameter("softness", 48.0 * screen_scale)
 	
 	
 
@@ -395,7 +513,7 @@ func update_crafting_book():
 		# Click to craft if possible
 		if can_make:
 			icon.gui_input.connect(func(event):
-				if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and not event.double_click:
 					craft_item(recipe_name)
 					update_inventory_ui()
 					update_crafting_book()
@@ -430,12 +548,12 @@ func update_inventory_ui():
 
 	for i in range(total_slots):
 		var slot = slot_scene.instantiate()
-		# Attach drag script
 		slot.inventory_index = i
 		slot.main_node = self
 		var texture_rect = slot.get_node("Control/TextureRect")
 		var label = slot.get_node("Control/Label")
 		var invname = slot.get_node("Control/Name")
+
 		if i < items.size():
 			var item_name = items[i]
 			texture_rect.texture = item_icons.get(item_name, null)
@@ -447,8 +565,10 @@ func update_inventory_ui():
 				($UI/InventoryWindow.visible and not $UI/CraftingBookWindow.visible) or
 				($UI/InventoryWindow.visible and $UI/CraftingBookWindow.visible and ui_focus == "inventory")
 			)
+
+			# Only highlight selected slot, not mode
+			var style = StyleBoxFlat.new()
 			if is_selected:
-				var style = StyleBoxFlat.new()
 				style.bg_color = Color(1, 1, 1, 0.7) # White with some transparency
 				slot.add_theme_stylebox_override("panel", style)
 				texture_rect.modulate = Color(1, 1, 1, 0.7) # White overlay on image
@@ -456,21 +576,71 @@ func update_inventory_ui():
 				slot.add_theme_stylebox_override("panel", null) # Reset to default
 				texture_rect.modulate = Color(1, 1, 1, 1) # Normal image
 
-			# Only connect for placeable items
+			# Only connect for placeable items (after all setup)
 			if item_name == "campfire" or item_name == "wall":
-				var this_item = item_name # capture by value
+				# Always use the current slot's item_name from items array at click time
 				texture_rect.gui_input.connect(func(event):
 					if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
-						is_placing = true
-						placing_item = this_item
-						$UI/InventoryWindow.visible = false
+						# Find the current item for this slot index (in case of drag/drop reorder)
+						var current_items = []
+						for n in inventory_order:
+							if inventory.has(n) and inventory[n] > 0:
+								current_items.append(n)
+						for n in inventory.keys():
+							if inventory[n] > 0 and not inventory_order.has(n):
+								current_items.append(n)
+						if i < current_items.size():
+							is_placing = true
+							placing_item = current_items[i]
+							$UI/InventoryWindow.visible = false
+							update_mode_indicator() # Show building mode label immediately
 				)
 		else:
 			texture_rect.texture = null
 			label.text = ""
 			texture_rect.modulate = Color(0.2, 0.2, 0.2, 1) # faded/gray
+
 		slot_container.add_child(slot)
+
+	# Clamp selected_inventory_index to valid range after UI update
+	if selected_inventory_index >= items.size():
+		selected_inventory_index = max(0, items.size() - 1)
 	update_quick_bar()
+	update_mode_indicator()
+
+func update_mode_indicator():
+	# Show a HUD indicator for deconstruction/building mode
+	# Remove any duplicate ModeIndicator labels
+	var mode_labels = []
+	for child in $UI.get_children():
+		if child is Label and child.name == "ModeIndicator":
+			mode_labels.append(child)
+	# Keep only one ModeIndicator, remove extras
+	while mode_labels.size() > 1:
+		var extra = mode_labels.pop_back()
+		extra.queue_free()
+	# Get or create the single ModeIndicator
+	var mode_label: Label
+	if mode_labels.size() == 1:
+		mode_label = mode_labels[0]
+	else:
+		mode_label = Label.new()
+		mode_label.name = "ModeIndicator"
+		mode_label.position = Vector2(24, 24)
+		mode_label.z_index = 10000
+		mode_label.add_theme_color_override("font_color", Color(1,0,0,1))
+		mode_label.add_theme_font_size_override("font_size", 32)
+		$UI.add_child(mode_label)
+	if is_deconstructing:
+		mode_label.text = "DECONSTRUCTION MODE"
+		mode_label.visible = true
+		mode_label.add_theme_color_override("font_color", Color(1,0,0,1))
+	elif is_placing:
+		mode_label.text = "BUILDING MODE"
+		mode_label.visible = true
+		mode_label.add_theme_color_override("font_color", Color(0.2,0.8,1,1))
+	else:
+		mode_label.visible = false
 
 func update_quick_bar():
 	if not quick_bar_container:
@@ -536,6 +706,14 @@ func craft_item(recipe_name):
 	inventory[recipe_name] += 1
 	update_quick_bar()
 
+	# Clamp selected_inventory_index to valid range after crafting
+	var items := []
+	for item_name in inventory.keys():
+		if inventory[item_name] > 0:
+			items.append(item_name)
+	if selected_inventory_index >= items.size():
+		selected_inventory_index = max(0, items.size() - 1)
+
 func place_object_on_tile(item_name, tile):
 	var tilemap = $NavigationRegion2D/TileMap
 	# Prevent placement near world edge
@@ -551,19 +729,14 @@ func place_object_on_tile(item_name, tile):
 		inventory[item_name] -= 1
 		update_inventory_ui()
 	elif item_name == "wall":
-		var wall_tile_id = TILE_WALL
-		tilemap.set_cell(0, tile, wall_tile_id, Vector2i(0, 0), 0)
-		tilemap.placed_walls[tile] = true
-		tilemap.modified_tiles[tile] = TILE_WALL
-		tilemap.queue_redraw() # Request redraw (Godot 4)
-		$NavigationRegion2D.bake_navigation_polygon()
-
-		print(tile, TILE_WALL)
-		print("Placing wall at tile:", tile, "with ID:", TILE_WALL)
-		print("TileSet has tile for ID 3:", tilemap.tile_set.get_source(TILE_WALL) != null)
+		var wall = wall_scene.instantiate()
+		wall.position = tilemap.map_to_local(tile)
+		wall.name = "Wall_%s_%s" % [tile.x, tile.y]
+		wall.add_to_group("walls")
+		tilemap.add_child(wall)
 		inventory[item_name] -= 1
 		update_inventory_ui()
-	update_quick_bar()
+		update_quick_bar()
 
 #-------------------- FOG OF WAR -----------------
 func compute_fov(tilemap: TileMap, origin: Vector2i, radius: int, is_blocker: Callable) -> Dictionary:
@@ -650,7 +823,7 @@ func find_valid_spawn_tile(tilemap):
 			tilemap.generate_chunk(chunk_coords)
 		var tile_type = tilemap.get_cell_source_id(0, Vector2i(x, y))
 		if tile_type != TILE_MOUNTAIN :
-			return Vector2i(0,3250 )
+			return Vector2i(x,y )
 		tries += 1
 	# fallback if not founds
 	print("fallback position")
@@ -857,6 +1030,106 @@ func _input(event):
 		_on_inventory_button_pressed()
 	if event.is_action_pressed("build"):
 		_on_crafting_book_button_pressed()
+	if event.is_action_pressed("deconstruction"):
+	   # Only allow toggling deconstruction mode if inventory is not visible
+		if not $UI/InventoryWindow.visible:
+			is_deconstructing = not is_deconstructing
+			play_ui_sound()
+			update_mode_indicator()
+			if is_deconstructing:
+				print("Deconstruction mode ON")
+			else:
+				print("Deconstruction mode OFF")
+		else:
+			print("[DEBUG] Cannot activate deconstruction mode while inventory is open.")
+
+	# --- DECONSTRUCTION ACTION (E) ---
+	if event.is_action_pressed("action"):
+		print("[DEBUG] _input: action pressed. is_deconstructing=%s, placing_item=%s" % [is_deconstructing, placing_item])
+		if is_deconstructing:
+			update_mode_indicator()
+			var tilemap = $NavigationRegion2D/TileMap
+			var player_tile = tilemap.local_to_map(player.position)
+			var directions = [Vector2i(0,0), Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
+			# Gather all candidates
+			deconstruct_candidates.clear()
+			for dir in directions:
+				var check_tile = player_tile + dir
+				var check_pos = tilemap.map_to_local(check_tile)
+				for wall in tilemap.get_children():
+					if wall.is_in_group("walls") and wall.position.distance_to(check_pos) < 2.0:
+						deconstruct_candidates.append({"node": wall, "type": "wall", "tile": check_tile, "pos": wall.position})
+				for campfire in get_tree().get_nodes_in_group("campfires"):
+					var campfire_tile = tilemap.local_to_map(campfire.position)
+					if campfire_tile == check_tile:
+						deconstruct_candidates.append({"node": campfire, "type": "campfire", "tile": check_tile, "pos": campfire.position})
+			if deconstruct_candidates.size() == 0:
+				print("[DEBUG] No wall or campfire found to deconstruct in adjacent tiles.")
+				if deconstruct_highlight:
+					deconstruct_highlight.queue_free()
+					deconstruct_highlight = null
+				return
+			elif deconstruct_candidates.size() == 1:
+				# Only one candidate, deconstruct immediately
+				var obj = deconstruct_candidates[0]
+				_deconstruct_object(obj)
+				if deconstruct_highlight:
+					deconstruct_highlight.queue_free()
+					deconstruct_highlight = null
+				return
+			else:
+				# Multiple candidates, cycle selection
+				if deconstruct_highlight:
+					deconstruct_highlight.queue_free()
+					deconstruct_highlight = null
+				if deconstruct_selected_idx >= deconstruct_candidates.size():
+					deconstruct_selected_idx = 0
+				var obj = deconstruct_candidates[deconstruct_selected_idx]
+				_show_deconstruct_highlight(obj.pos)
+				print("[DEBUG] Multiple candidates. Highlighting idx %d: %s at %s" % [deconstruct_selected_idx, obj.type, obj.pos])
+				deconstruct_selected_idx += 1
+				if deconstruct_selected_idx >= deconstruct_candidates.size():
+					deconstruct_selected_idx = 0
+				# To confirm deconstruction, require a second key (e.g., Enter) or double E press
+				# (You can refine this with a timer or use another key for confirmation)
+
+	if is_deconstructing and event.is_action_pressed("ui_accept") and deconstruct_candidates.size() > 1:
+		update_mode_indicator()
+		# Confirm deconstruction of currently highlighted
+		var idx = (deconstruct_selected_idx - 1 + deconstruct_candidates.size()) % deconstruct_candidates.size()
+		var obj = deconstruct_candidates[idx]
+		_deconstruct_object(obj)
+		if deconstruct_highlight:
+			deconstruct_highlight.queue_free()
+			deconstruct_highlight = null
+		deconstruct_candidates.clear()
+		deconstruct_selected_idx = 0
+
+func _deconstruct_object(obj):
+	if obj.type == "wall":
+		obj.node.queue_free()
+		if not inventory.has("wall"):
+			inventory["wall"] = 0
+		inventory["wall"] += 1
+	elif obj.type == "campfire":
+		obj.node.queue_free()
+		if not inventory.has("campfire"):
+			inventory["campfire"] = 0
+		inventory["campfire"] += 1
+	update_inventory_ui()
+	update_quick_bar()
+
+func _show_deconstruct_highlight(pos):
+	if deconstruct_highlight:
+		deconstruct_highlight.queue_free()
+	deconstruct_highlight = ColorRect.new()
+	deconstruct_highlight.color = Color(1,0,0,0.3)
+	deconstruct_highlight.size = Vector2(32,32)
+	deconstruct_highlight.position = pos - Vector2(16,16)
+	deconstruct_highlight.z_index = 1000
+	add_child(deconstruct_highlight)
+	# Add to the bottom of the file for input mapping instructions
+	# You must add an input action named "deconstruct" in your Godot project settings and bind it to a key (e.g., X)
 
 func play_ui_sound():
 	if ui_player:
@@ -904,7 +1177,7 @@ func _on_harvest_button_pressed() -> void:
 							continue
 						var neighbor_tile = player_tile + Vector2i(dx, dy)
 						var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
-						if neighbor_type != TILE_FOREST and neighbor_type != TILE_WALL:
+						if neighbor_type != TILE_FOREST :
 							neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
 				if neighbor_counts.size() > 0:
 					# Found at least one non-forest tile in this radius
@@ -941,7 +1214,7 @@ func _on_harvest_button_pressed() -> void:
 							continue
 						var neighbor_tile = player_tile + Vector2i(dx, dy)
 						var neighbor_type = tilemap.get_cell_source_id(0, neighbor_tile)
-						if neighbor_type != TILE_SALTFLATS and neighbor_type != TILE_WALL and neighbor_type != TILE_MOUNTAIN:
+						if neighbor_type != TILE_SALTFLATS and neighbor_type != TILE_MOUNTAIN:
 							neighbor_counts[neighbor_type] = neighbor_counts.get(neighbor_type, 0) + 1
 				if neighbor_counts.size() > 0:
 					var max_count = 0
@@ -956,6 +1229,26 @@ func _on_harvest_button_pressed() -> void:
 			tilemap.modified_tiles[player_tile] = new_tile
 			print("The saltflats have been depleted and turned into tile ID %d!" % new_tile)
 			forest_harvest_counts.erase(player_tile)
+	else:
+		# Check for reed harvest: standing on wetland with a reed node present
+		var reed_found = false
+		# Find all reed nodes in the scene
+		for child in tilemap.get_children():
+			if child is AnimatedSprite2D:
+				# Check if the reed is at the player's tile (allow some pixel tolerance)
+				var reed_tile = tilemap.local_to_map(child.position)
+				if reed_tile == player_tile:
+					# Optionally check for the correct sprite_frames resource to confirm it's a reed
+					if child.sprite_frames and child.sprite_frames.resource_path.find("reed") != -1:
+						reed_found = true
+						child.queue_free()
+						if not inventory.has("reed"):
+							inventory["reed"] = 0
+						inventory["reed"] += 1
+						print("You harvested a reed! Total reeds: %d" % inventory["reed"])
+						break
+		if not reed_found:
+			print("No reed to harvest at this location.")
 	update_inventory_ui()
 	update_crafting_book()
 	# Play step sound if player is moving

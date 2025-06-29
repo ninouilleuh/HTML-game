@@ -8,7 +8,7 @@ var moving := false
 var move_target := Vector2.ZERO
 
 var step_player = null
-var step_sound := preload("res://assets/step.mp3")
+var step_sound := preload("res://assets/sound/step.mp3")
 var was_moving := false
 var last_step_tile = null
 var can_play_step_sound := true

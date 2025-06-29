@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://dxuc5xtknimsc"]
 
-[ext_resource type="Script" uid="uid://cvfs6pshhrq73" path="res://scenes/goat.gd" id="1_er772"]
+[ext_resource type="Script" uid="uid://cvfs6pshhrq73" path="res://script/goat.gd" id="1_er772"]
 [ext_resource type="Texture2D" uid="uid://chv5t2kedelei" path="res://assets/enemies/pig.png" id="1_r7g3o"]
 
 [node name="goat" type="CharacterBody2D"]

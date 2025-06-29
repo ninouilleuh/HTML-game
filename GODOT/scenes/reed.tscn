@@ -1,0 +1,24 @@
+[gd_scene load_steps=4 format=3 uid="uid://bx3r4ssnnvh25"]
+
+[ext_resource type="Texture2D" uid="uid://217ju6i863ib" path="res://assets/weedtransparent.png" id="1_d8eff"]
+[ext_resource type="Texture2D" uid="uid://yr11vusxb3v2" path="res://assets/weedtransparent2.png" id="2_tthdt"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_tthdt"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_d8eff")
+}, {
+"duration": 1.0,
+"texture": ExtResource("2_tthdt")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
+
+[node name="reed" type="AnimatedSprite2D"]
+sprite_frames = SubResource("SpriteFrames_tthdt")
+autoplay = "default"
+frame_progress = 0.805275
+speed_scale = 0.1

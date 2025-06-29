@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://disfrftfmxylm"]
 
-[ext_resource type="Script" uid="uid://big7ka4wh685v" path="res://scenes/tutorial_screen.gd" id="1_obyet"]
+[ext_resource type="Script" uid="uid://big7ka4wh685v" path="res://script/tutorial_screen.gd" id="1_obyet"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rirto"]
 bg_color = Color(0, 0, 0, 1)

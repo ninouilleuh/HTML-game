@@ -1,0 +1,251 @@
+[gd_scene load_steps=14 format=3 uid="uid://pfmbets05ulg"]
+
+[ext_resource type="Script" uid="uid://vheosc3x2hvu" path="res://script/main.gd" id="1_jyhfs"]
+[ext_resource type="TileSet" uid="uid://ddrgf4g0fv8o" path="res://tiles/terrain_tileset.tres" id="1_o5qli"]
+[ext_resource type="Script" uid="uid://dy2gnfpnfoaqq" path="res://script/map_generator.gd" id="2_0wfyh"]
+[ext_resource type="Shader" uid="uid://d2g7q0gcmholq" path="res://scenes/campfire.gdshader" id="2_jyhfs"]
+[ext_resource type="Shader" uid="uid://c028otwmqs6tr" path="res://scenes/fog.gdshader" id="2_tbgi4"]
+[ext_resource type="Texture2D" uid="uid://ceti4loky3ibf" path="res://assets/image-removebg-preview (2).png" id="2_tefeu"]
+[ext_resource type="Texture2D" uid="uid://bahpcl47jaabo" path="res://assets/transparentHUD.png" id="3_o6xl0"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sugp2"]
+bg_color = Color(0, 0, 0, 0.490196)
+corner_radius_top_left = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 10
+
+[sub_resource type="SystemFont" id="SystemFont_sugp2"]
+font_italic = true
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tbgi4"]
+bg_color = Color(0.6, 0.6, 0.6, 0)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tefeu"]
+shader = ExtResource("2_tbgi4")
+shader_parameter/player_screen_pos = Vector2(0, 0)
+shader_parameter/vision_radius = 200.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tbgi4"]
+shader = ExtResource("2_jyhfs")
+shader_parameter/radius = 160.0
+shader_parameter/softness = 48.0
+shader_parameter/overlay_color = Color(0, 0, 0, 1)
+shader_parameter/CAMPFIRE_COUNT = 0
+shader_parameter/CAMPFIRE_POSITIONS = PackedVector2Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/viewport_size = Vector2(0, 0)
+
+[sub_resource type="NavigationPolygon" id="NavigationPolygon_sugp2"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_jyhfs")
+
+[node name="UI" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="TimePanel" type="Panel" parent="UI"]
+anchors_preset = -1
+anchor_left = 0.454
+anchor_top = 0.016
+anchor_right = 0.606
+anchor_bottom = 0.107
+offset_left = -54.0
+offset_right = 2.0
+offset_bottom = 33.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_sugp2")
+
+[node name="TimeLabel" type="Label" parent="UI/TimePanel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -20.5
+offset_top = -49.0
+offset_right = 20.5
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.873303, 0.901717, 7.70092e-07, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_fonts/font = SubResource("SystemFont_sugp2")
+text = "00:00
+"
+horizontal_alignment = 2
+
+[node name="HarvestButton" type="Button" parent="UI"]
+visible = false
+anchors_preset = -1
+anchor_left = 0.025
+anchor_top = 0.5
+anchor_right = 0.033
+anchor_bottom = 0.5
+offset_top = -15.5
+offset_right = 69.0
+offset_bottom = 15.5
+grow_vertical = 2
+text = "Harvest"
+
+[node name="InventoryButton" type="Button" parent="UI"]
+anchors_preset = -1
+anchor_left = 0.867
+anchor_top = 0.896
+anchor_right = 0.984
+anchor_bottom = 0.961
+grow_horizontal = 0
+grow_vertical = 0
+text = "Inventory"
+
+[node name="QuickBar" type="HBoxContainer" parent="UI"]
+anchors_preset = -1
+anchor_left = 0.475
+anchor_top = 0.926
+anchor_right = 0.525
+anchor_bottom = 0.926
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="InventoryWindow" type="Panel" parent="UI"]
+visible = false
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.566
+anchor_right = 0.516
+anchor_bottom = 0.598
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="BackpackFrame" type="TextureRect" parent="UI/InventoryWindow"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_tefeu")
+
+[node name="Label" type="Label" parent="UI/InventoryWindow/BackpackFrame"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -37.0
+offset_top = 90.0
+offset_right = 37.0
+offset_bottom = 113.0
+grow_horizontal = 2
+text = "BackPack"
+horizontal_alignment = 1
+vertical_alignment = 1
+justification_flags = 171
+
+[node name="SlotContainer" type="GridContainer" parent="UI/InventoryWindow/BackpackFrame"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.295
+anchor_right = 0.5
+anchor_bottom = 1.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/v_separation = 20
+columns = 5
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/InventoryWindow/BackpackFrame"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+grow_horizontal = 0
+
+[node name="CraftingBookButton" type="Button" parent="UI"]
+anchors_preset = -1
+anchor_left = 0.033
+anchor_top = 0.016
+anchor_right = 0.131
+anchor_bottom = 0.081
+offset_right = 8.0
+offset_bottom = 8.0
+text = "Crafting Book"
+
+[node name="CraftingBookWindow" type="Panel" parent="UI"]
+visible = false
+anchors_preset = -1
+anchor_left = 0.033
+anchor_top = 0.476
+anchor_right = 1.0
+anchor_bottom = 0.623
+offset_top = 41.0
+offset_right = 40.0
+offset_bottom = 81.0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_tbgi4")
+
+[node name="RecipeList" type="VBoxContainer" parent="UI/CraftingBookWindow"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="HUD" type="TextureRect" parent="UI"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_o6xl0")
+
+[node name="CanvasLayer2" type="CanvasLayer" parent="."]
+
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer2"]
+material = SubResource("ShaderMaterial_tefeu")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+layer = 0
+
+[node name="DayNightOverlay" type="ColorRect" parent="CanvasLayer"]
+material = SubResource("ShaderMaterial_tbgi4")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="DEBUG" type="Camera2D" parent="."]
+enabled = false
+zoom = Vector2(0.05, 0.05)
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="."]
+navigation_polygon = SubResource("NavigationPolygon_sugp2")
+
+[node name="TileMap" type="TileMap" parent="NavigationRegion2D"]
+tile_set = ExtResource("1_o5qli")
+format = 2
+script = ExtResource("2_0wfyh")
+chunk_size = null
+render_distance = null
+
+[node name="FogTileMap" type="TileMap" parent="NavigationRegion2D"]
+tile_set = ExtResource("1_o5qli")
+format = 2
+
+[connection signal="pressed" from="UI/HarvestButton" to="." method="_on_harvest_button_pressed"]
+[connection signal="pressed" from="UI/InventoryButton" to="." method="_on_inventory_button_pressed"]
+[connection signal="pressed" from="UI/CraftingBookButton" to="." method="_on_crafting_book_button_pressed"]
