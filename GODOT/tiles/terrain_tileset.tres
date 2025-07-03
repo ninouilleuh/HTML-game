@@ -3,7 +3,7 @@
 [ext_resource type="Texture2D" uid="uid://rnc81y6nljnk" path="res://tiles/png/forest.png" id="1_nfvoa"]
 [ext_resource type="Texture2D" uid="uid://d4k3r8plw7rae" path="res://tiles/png/wetland.png" id="2_2xwus"]
 [ext_resource type="Texture2D" uid="uid://dyl7kay51m5f8" path="res://tiles/png/fogtr.png" id="2_gtyl6"]
-[ext_resource type="Texture2D" uid="uid://bf4763nuwsago" path="res://assets/wall.png" id="3_2xwus"]
+[ext_resource type="Texture2D" uid="uid://bf4763nuwsago" path="res://assets/items/wall.png" id="3_2xwus"]
 [ext_resource type="Texture2D" uid="uid://c35wjltplqonk" path="res://tiles/png/grass.png" id="3_gtyl6"]
 [ext_resource type="Texture2D" uid="uid://cwlhtbcovasd0" path="res://tiles/png/hill.png" id="4_0v7na"]
 [ext_resource type="Texture2D" uid="uid://bpyguf2y41wju" path="res://tiles/png/lake.png" id="5_o0jjc"]

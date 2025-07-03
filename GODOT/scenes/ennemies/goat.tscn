@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://dxuc5xtknimsc"]
+
+[ext_resource type="Script" uid="uid://cvfs6pshhrq73" path="res://script/goat.gd" id="1_k6qv8"]
+[ext_resource type="Texture2D" uid="uid://chv5t2kedelei" path="res://assets/enemies/pig.png" id="2_g1rg0"]
+
+[node name="goat" type="CharacterBody2D"]
+script = ExtResource("1_k6qv8")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_g1rg0")

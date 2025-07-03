@@ -23,7 +23,7 @@ var demonic_pending_wait := 10.0 # seconds to wait before turning demonic
 var demonic_duration := 300.0 # 5 minutes in seconds
 var demonic_timer := 0.0
 var transform_player = null
-var transform_sound := preload("res://assets/sound/goat_transform.mp3")
+var transform_sound := preload("res://assets/sound/Goat.wav")
 var played_transform_sound := false
 
 

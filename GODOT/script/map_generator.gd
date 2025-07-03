@@ -447,6 +447,7 @@ func generate_chunk(chunk_coords: Vector2i):
 			if randi() % 100 < 1:
 				var reed = reed_scene.instantiate()
 				reed.position = Vector2(x * 64 + 32, y * 64 +32)
+				reed.add_to_group("reed")
 				add_child(reed)
 
 	# --- CAVE ENTRANCE PLACEMENT ---
@@ -465,14 +466,31 @@ func generate_chunk(chunk_coords: Vector2i):
 
 	if main.unloaded_campfires.has(chunk_coords):
 		for campfire_pos in main.unloaded_campfires[chunk_coords]:
-			var campfire_scene = preload("res://scenes/Campfire.tscn")
+			var campfire_scene = preload("res://scenes/placeable/Campfire.tscn")
 			var campfire = campfire_scene.instantiate()
 			campfire.position = campfire_pos
 			campfire.add_to_group("campfires")
 			main.add_child(campfire)
 		main.unloaded_campfires.erase(chunk_coords)
 
+	if main.unloaded_reed.has(chunk_coords):
+		for reed_pos in main.unloaded_reed[chunk_coords]:
+			var reed = reed_scene.instantiate()
+			reed.position = reed_pos
+			reed.add_to_group("reed")
+			main.add_child(reed)
+		main.unloaded_reed.erase(chunk_coords)
+	
+	if main.unloaded_walls.has(chunk_coords):
+		for wall_pos in main.unloaded_walls[chunk_coords]:
+			var wall_scene = preload("res://scenes/placeable/wall.tscn")
+			var wall = wall_scene.instantiate()
+			wall.position = wall_pos
+			wall.add_to_group("walls")
+			main.add_child(wall)
+		main.unloaded_walls.erase(chunk_coords)
 	# --- RESTORE GOATS ---
+	
 	if main.unloaded_goats and main.unloaded_goats.has(chunk_coords):
 		for goat_data in main.unloaded_goats[chunk_coords]:
 			var goat = main.goat_scene.instantiate()
@@ -533,7 +551,6 @@ func unload_chunk(chunk_coords: Vector2i):
 			pig.get_parent().remove_child(pig)
 			pig.queue_free()
 			main.pigs.erase(pig)
-
 	# Remove campfires in this chunk
 	for campfire in main.get_tree().get_nodes_in_group("campfires").duplicate():
 		var campfire_tile = local_to_map(campfire.position)
@@ -543,6 +560,25 @@ func unload_chunk(chunk_coords: Vector2i):
 				main.unloaded_campfires[chunk_coords] = []
 			main.unloaded_campfires[chunk_coords].append(campfire.position)
 			campfire.queue_free()
+	#Remove reed in this chunk
+	for reed in main.get_tree().get_nodes_in_group("reed").duplicate():
+		var reed_tile = local_to_map(reed.position)
+		var reed_chunk = Vector2i(floor(reed_tile.x / chunk_size), floor(reed_tile.y / chunk_size))
+		if reed_chunk == chunk_coords:
+			if not main.unloaded_reed.has(chunk_coords):
+				main.unloaded_reed[chunk_coords] = []
+			main.unloaded_reed[chunk_coords].append(reed.position)
+			reed.queue_free()
+
+	# Remove walls in this chunk
+	for wall in main.get_tree().get_nodes_in_group("walls").duplicate():
+		var wall_tile = local_to_map(wall.position)
+		var wall_chunk = Vector2i(floor(wall_tile.x / chunk_size), floor(wall_tile.y / chunk_size))
+		if wall_chunk == chunk_coords:
+			if not main.unloaded_walls.has(chunk_coords):
+				main.unloaded_walls[chunk_coords] = []
+			main.unloaded_walls[chunk_coords].append(wall.position)
+			wall.queue_free()
 
 	# --- UNLOAD GOATS ---
 	for goat in main.get_tree().get_nodes_in_group("goats").duplicate():

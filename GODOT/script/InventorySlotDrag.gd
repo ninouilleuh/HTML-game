@@ -14,7 +14,6 @@ func _ready():
 	# Force minimum size for drag-and-drop debug
 	custom_minimum_size = Vector2(64, 64)
 	# Print size and position for debug
-	print("[DEBUG] Panel ready. Size:", size, "Position:", position, "Visible:", visible)
 	# Removed debug red border
 
 func gui_input(event):

@@ -9,6 +9,8 @@ var move_target := Vector2.ZERO
 
 var step_player = null
 var step_sound := preload("res://assets/sound/step.mp3")
+# Add sand step sound
+var step_sand_sound := preload("res://assets/sound/sand_step.mp3")
 var was_moving := false
 var last_step_tile = null
 var can_play_step_sound := true
@@ -136,11 +138,24 @@ func _process(delta):
 
 	# --- STEP SOUND LOGIC ---
 	var current_tile = tilemap.local_to_map(position)
+	const TILE_DESERTSAND = 12
+	var tile_type = tilemap.get_cell_source_id(0, current_tile)
 	if moving:
 		stopped_time = 0.0
-		if last_step_tile == null or current_tile != last_step_tile:
+		# Always check if the correct step sound is playing for the tile
+		var should_be_sand = tile_type == TILE_DESERTSAND
+		var current_stream = step_player.stream
+		var desired_stream = step_sand_sound if should_be_sand else step_sound
+		if current_stream != desired_stream:
+			# If the stream is not correct, switch immediately and play
+			if step_player.playing:
+				step_player.stop()
+			step_player.stream = desired_stream
+			step_player.play()
+			can_play_step_sound = false
+			last_step_tile = current_tile
+		elif last_step_tile == null or current_tile != last_step_tile:
 			if can_play_step_sound and not step_player.playing:
-				print("DEBUG: Playing step sound for new tile")
 				step_player.play()
 				can_play_step_sound = false
 			last_step_tile = current_tile

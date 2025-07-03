@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3 uid="uid://bd1wu8y8lk13y"]
+
+[ext_resource type="Texture2D" uid="uid://d28nuomw1yv72" path="res://assets/items/crafting_table.png" id="1_io7ug"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_qopxf"]
+size = Vector2(190, 64)
+
+[node name="crafting_table" type="StaticBody2D"]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1_io7ug")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_qopxf")
