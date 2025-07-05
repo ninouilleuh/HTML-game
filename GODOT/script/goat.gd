@@ -62,10 +62,12 @@ func _process(delta):
 		var main = get_node("/root/Main") if has_node("/root/Main") else null
 		if main and main.has_method("game_over"):
 			main.game_over()
+			self.queue_free()
 		else:
 			var game_over_scene = preload("res://scenes/GameOverScreen.tscn")
 			if game_over_scene:
 				get_tree().change_scene_to_file("res://scenes/GameOverScreen.tscn")
+				self.queue_free()
 
 	# If waiting to become demonic, stand still for 10 seconds (transformation stage)
 	if demonic_pending:

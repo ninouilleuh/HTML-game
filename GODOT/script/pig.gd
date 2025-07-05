@@ -3,7 +3,7 @@ extends CharacterBody2D
 var chunk_coords = Vector2i.ZERO
 var tile_size := 64.0
 var chase_distance := tile_size * 10 # 10 tiles
-var speed := 800 # Slower pig speed
+var speed := 650 # Slower pig speed
 var chase_speed := speed          # Pig movement speed in pixels/sec
 var player = null           # Reference to player node
 var tilemap = null

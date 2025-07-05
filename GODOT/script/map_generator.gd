@@ -478,7 +478,7 @@ func generate_chunk(chunk_coords: Vector2i):
 			var reed = reed_scene.instantiate()
 			reed.position = reed_pos
 			reed.add_to_group("reed")
-			main.add_child(reed)
+			add_child(reed)
 		main.unloaded_reed.erase(chunk_coords)
 	
 	if main.unloaded_walls.has(chunk_coords):

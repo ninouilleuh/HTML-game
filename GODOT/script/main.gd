@@ -1098,13 +1098,15 @@ func _input(event):
 #   if event.is_action_pressed("build"):
 		#_on_crafting_book_button_pressed()
 	if event.is_action_pressed("deconstruction"):
-	   # Only allow toggling deconstruction mode if inventory is not visible
+		# Only allow toggling deconstruction mode if inventory is not visible
 		if not $UI/InventoryWindow.visible:
 			is_deconstructing = not is_deconstructing
 			play_ui_sound()
 			update_mode_indicator()
 			if is_deconstructing:
 				print("Deconstruction mode ON")
+				is_placing = false
+				placing_item = ""
 			else:
 				print("Deconstruction mode OFF")
 		else:
@@ -1224,59 +1226,86 @@ func _input(event):
 						play_ui_sound()
 						update_inventory_ui()
 # --- Visually highlight the selected recipe icon in the crafting book ---
-	# --- DECONSTRUCTION ACTION (E) ---
-	if event.is_action_pressed("action"):
-		print("[DEBUG] _input: action pressed. is_deconstructing=%s, placing_item=%s" % [is_deconstructing, placing_item])
-		if is_deconstructing:
-			update_mode_indicator()
-			var tilemap = $NavigationRegion2D/TileMap
-			var player_tile = tilemap.local_to_map(player.position)
-			var directions = [Vector2i(0,0), Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
-			# Gather all candidates
-			deconstruct_candidates.clear()
-			for dir in directions:
-				var check_tile = player_tile + dir
-				var check_pos = tilemap.map_to_local(check_tile)
-				for wall in tilemap.get_children():
-					if wall.is_in_group("walls") and wall.position.distance_to(check_pos) < 2.0:
-						deconstruct_candidates.append({"node": wall, "type": "wall", "tile": check_tile, "pos": wall.position})
-				for campfire in get_tree().get_nodes_in_group("campfires"):
-					var campfire_tile = tilemap.local_to_map(campfire.position)
-					if campfire_tile == check_tile:
-						deconstruct_candidates.append({"node": campfire, "type": "campfire", "tile": check_tile, "pos": campfire.position})
-			if deconstruct_candidates.size() == 0:
-				print("[DEBUG] No wall or campfire found to deconstruct in adjacent tiles.")
-				if deconstruct_highlight:
-					deconstruct_highlight.queue_free()
-					deconstruct_highlight = null
-				return
-			elif deconstruct_candidates.size() == 1:
-				# Only one candidate, deconstruct immediately
-				var obj = deconstruct_candidates[0]
-				_deconstruct_object(obj)
-				if deconstruct_highlight:
-					deconstruct_highlight.queue_free()
-					deconstruct_highlight = null
-				return
-			else:
-				# Multiple candidates, cycle selection
-				if deconstruct_highlight:
-					deconstruct_highlight.queue_free()
-					deconstruct_highlight = null
-				if deconstruct_selected_idx >= deconstruct_candidates.size():
-					deconstruct_selected_idx = 0
-				var obj = deconstruct_candidates[deconstruct_selected_idx]
-				_show_deconstruct_highlight(obj.pos)
-				print("[DEBUG] Multiple candidates. Highlighting idx %d: %s at %s" % [deconstruct_selected_idx, obj.type, obj.pos])
-				deconstruct_selected_idx += 1
-				if deconstruct_selected_idx >= deconstruct_candidates.size():
-					deconstruct_selected_idx = 0
-				# To confirm deconstruction, require a second key (e.g., Enter) or double E press
-				# (You can refine this with a timer or use another key for confirmation)
 
-	if is_deconstructing and event.is_action_pressed("ui_accept") and deconstruct_candidates.size() > 1:
+	# --- DECONSTRUCTION SELECTION (E) ---
+	if is_deconstructing and event.is_action_pressed("action"):
 		update_mode_indicator()
-		# Confirm deconstruction of currently highlighted
+		var tilemap = $NavigationRegion2D/TileMap
+		var player_tile = tilemap.local_to_map(player.position)
+		var directions = [Vector2i(0,0), Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
+		# Gather all candidates
+		deconstruct_candidates.clear()
+		for dir in directions:
+			var check_tile = player_tile + dir
+			var check_pos = tilemap.map_to_local(check_tile)
+			for wall in tilemap.get_children():
+				if wall.is_in_group("walls") and wall.position.distance_to(check_pos) < 2.0:
+					deconstruct_candidates.append({"node": wall, "type": "wall", "tile": check_tile, "pos": wall.position})
+			for campfire in get_tree().get_nodes_in_group("campfires"):
+				var campfire_tile = tilemap.local_to_map(campfire.position)
+				if campfire_tile == check_tile:
+					deconstruct_candidates.append({"node": campfire, "type": "campfire", "tile": check_tile, "pos": campfire.position})
+		if deconstruct_candidates.size() == 0:
+			print("[DEBUG] No wall or campfire found to deconstruct in adjacent tiles.")
+			if deconstruct_highlight:
+				deconstruct_highlight.queue_free()
+				deconstruct_highlight = null
+			return
+		if deconstruct_candidates.size() == 1:
+			# Only one candidate, nothing to cycle/select
+			if deconstruct_highlight:
+				deconstruct_highlight.queue_free()
+				deconstruct_highlight = null
+			_show_deconstruct_highlight(deconstruct_candidates[0].pos)
+			deconstruct_selected_idx = 0
+			return
+		# Multiple candidates: cycle selection
+		if deconstruct_highlight:
+			deconstruct_highlight.queue_free()
+			deconstruct_highlight = null
+		if deconstruct_selected_idx >= deconstruct_candidates.size():
+			deconstruct_selected_idx = 0
+		var obj = deconstruct_candidates[deconstruct_selected_idx]
+		_show_deconstruct_highlight(obj.pos)
+		print("[DEBUG] Highlighting idx %d: %s at %s" % [deconstruct_selected_idx, obj.type, obj.pos])
+		deconstruct_selected_idx += 1
+		if deconstruct_selected_idx >= deconstruct_candidates.size():
+			deconstruct_selected_idx = 0
+
+	# --- DECONSTRUCTION CONFIRM (ACCEPT) ---
+	if is_deconstructing and event.is_action_pressed("accept"):
+		update_mode_indicator()
+		var tilemap = $NavigationRegion2D/TileMap
+		var player_tile = tilemap.local_to_map(player.position)
+		var directions = [Vector2i(0,0), Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
+		# Always gather candidates fresh for accept
+		deconstruct_candidates.clear()
+		for dir in directions:
+			var check_tile = player_tile + dir
+			var check_pos = tilemap.map_to_local(check_tile)
+			for wall in tilemap.get_children():
+				if wall.is_in_group("walls") and wall.position.distance_to(check_pos) < 2.0:
+					deconstruct_candidates.append({"node": wall, "type": "wall", "tile": check_tile, "pos": wall.position})
+			for campfire in get_tree().get_nodes_in_group("campfires"):
+				var campfire_tile = tilemap.local_to_map(campfire.position)
+				if campfire_tile == check_tile:
+					deconstruct_candidates.append({"node": campfire, "type": "campfire", "tile": check_tile, "pos": campfire.position})
+		if deconstruct_candidates.size() == 0:
+			if deconstruct_highlight:
+				deconstruct_highlight.queue_free()
+				deconstruct_highlight = null
+			return
+		if deconstruct_candidates.size() == 1:
+			# Only one candidate, deconstruct immediately
+			var obj = deconstruct_candidates[0]
+			_deconstruct_object(obj)
+			if deconstruct_highlight:
+				deconstruct_highlight.queue_free()
+				deconstruct_highlight = null
+			deconstruct_candidates.clear()
+			deconstruct_selected_idx = 0
+			return
+		# Multiple candidates: deconstruct currently highlighted
 		var idx = (deconstruct_selected_idx - 1 + deconstruct_candidates.size()) % deconstruct_candidates.size()
 		var obj = deconstruct_candidates[idx]
 		_deconstruct_object(obj)
