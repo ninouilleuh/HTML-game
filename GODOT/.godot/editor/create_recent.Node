@@ -1,8 +1,9 @@
+GridContainer
+Panel
+NavigationObstacle2D
 CollisionShape2D
 Sprite2D
 StaticBody2D
-Panel
-GridContainer
 AnimatedSprite2D
 TextureRect
 TileMap
@@ -11,5 +12,3 @@ HBoxContainer
 Label
 CanvasLayer
 CharacterBody2D
-ColorRect
-NavigationObstacle2D

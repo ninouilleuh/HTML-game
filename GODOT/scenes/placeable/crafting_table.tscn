@@ -12,3 +12,7 @@ texture = ExtResource("1_io7ug")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_qopxf")
+
+[node name="NavigationObstacle2D" type="NavigationObstacle2D" parent="."]
+radius = 30.9
+vertices = PackedVector2Array(95, -31, 95, 31, -96, 31, -94, -31)

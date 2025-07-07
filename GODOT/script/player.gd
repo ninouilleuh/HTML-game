@@ -2,7 +2,10 @@ extends Node2D
 
 const TILE_MOUNTAIN = 5 
 const TILE_WALL = 11
-@export var move_speed := 900  # Pixels per second
+var base_speed := 900
+var mountain_speed := 200
+@export var move_speed = base_speed  # Pixels per second
+
 var tile_size := 64
 var moving := false
 var move_target := Vector2.ZERO
@@ -111,15 +114,32 @@ func _process(delta):
 				var target_tile = current_tile + move_delta
 				var tile_type = tilemap.get_cell_source_id(0, target_tile)
 				var target_pos = tilemap.map_to_local(target_tile)
-				# Check for wall at target position
+				# Check for wall or table at target position
 				var wall_blocked = false
 				for wall in get_tree().get_nodes_in_group("walls"):
 					if wall.position.distance_to(target_pos) < tile_size * 0.5:
 						wall_blocked = true
 						break
-
-				if tile_type != TILE_MOUNTAIN and tile_type != TILE_WALL and not wall_blocked:
+				# Check for crafting table at target position and its left/right neighbors
+				var table_blocked = false
+				var check_positions = [target_pos]
+				# Add left and right tile positions
+				check_positions.append(tilemap.map_to_local(target_tile + Vector2i(-1, 0)))
+				check_positions.append(tilemap.map_to_local(target_tile + Vector2i(1, 0)))
+				for table in get_tree().get_nodes_in_group("tables"):
+					for pos in check_positions:
+						if table.position.distance_to(pos) < tile_size * 0.5:
+							table_blocked = true
+							break
+					if table_blocked:
+						break
+				
+				if not main.is_blocker(tilemap, target_tile) and tile_type != TILE_WALL and not wall_blocked and not table_blocked:
 					# Wrap target_pos.x to the nearest equivalent to player
+					if tile_type == TILE_MOUNTAIN:
+						move_speed = mountain_speed
+					else :
+						move_speed = base_speed
 					target_pos.x = get_nearest_wrapped_x(target_pos.x)
 					move_target = target_pos
 					moving = true

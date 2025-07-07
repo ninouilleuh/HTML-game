@@ -8,7 +8,7 @@ var day := 1
 const HOURS_PER_DAY := 24
 const SECONDS_PER_HOUR := 60.0 # 1 hour = 1 minute real time
 # Dictionaries
-var inventory = {"stick" : 0, "big_stick":0, "salt":0
+var inventory = {"stick" : 0, "big_stick":50, "salt":0, "reed":10
 }
 var item_icons = {
 	"stick": preload("res://assets/items/stick.png"),
@@ -37,17 +37,17 @@ var recipes = {
 	
 	#those will need crafting table
 	"axe" : ["big_stick","big_stick"], 
-	"rope" : ["reed"],
+	"rope" : ["reed", "reed", "reed"],
 	"carpet" : ["reed", "leather"], 
-	"door" : ["reed"], #need crafting table 
-	"trap" :  ["reed"], #need crafting table 
-	"shovel" :  ["reed"], #need crafting table 
-	"cauldron" :  ["iron"], #need crafting table 
-	"knife" :  ["iron"], #need crafting table
-	"whistle" :  ["iron"], #need crafting table
-	"hat" : ["leather"], #need crafting table
-	"gloves" : ["leather"], #need crafting table
-	"scarecrow" : ["leather"], #need crafting table
+	"door" : ["reed"],
+	"trap" :  ["reed"], 
+	"shovel" :  ["reed","reed","big_stick"], 
+	"cauldron" :  ["iron"], 
+	"knife" :  ["iron"], 
+	"whistle" :  ["iron"], 
+	"hat" : ["leather"], 
+	"gloves" : ["leather"], 
+	"scarecrow" : ["leather"], 
 }
 
 var unloaded_pigs := {} # Key: chunk_coords, Value: Array of pig data (e.g., positions)
@@ -65,6 +65,7 @@ const TILE_FOREST = 0
 const WORLD_MIN = -5000
 const WORLD_MAX = 5000
 var wall_scene = preload("res://scenes/placeable/wall.tscn")
+var craftingtab_scene = preload("res://scenes/placeable/crafting_table.tscn")
 const TILE_MOUNTAIN = 5
 const TILE_GRASS = 2 # Use your actual grass tile ID
 # Cave entrance tile ID (choose a unique unused tile ID)
@@ -460,7 +461,7 @@ func _process(delta):
 					current_items.append(n)
 			if i < current_items.size():
 				var item_name = current_items[i]
-				if item_name == "campfire" or item_name == "wall":
+				if item_name == "campfire" or item_name == "wall" or item_name == "crafting_table":
 					is_placing = true
 					placing_item = item_name
 					$UI/InventoryWindow.visible = false
@@ -518,18 +519,18 @@ var recipe_descriptions = {
 	"wall": "Blocks enemies and movement.",
 	"big_stick": "A larger stick for crafting.",
 	"crafting_table": "Unlocks advanced recipes.",
-	"axe": "Chop trees faster (needs table).",
-	"rope": "Used for crafting (needs table).",
-	"carpet": "Decorative (needs table).",
-	"door": "Lets you pass through walls (needs table).",
-	"trap": "Catches animals (needs table).",
-	"shovel": "Dig up tiles (needs table).",
-	"cauldron": "Cook food (needs table).",
-	"knife": "Cut things (needs table).",
-	"whistle": "Call animals (needs table).",
-	"hat": "Wearable (needs table).",
-	"gloves": "Wearable (needs table).",
-	"scarecrow": "Scares animals (needs table)."
+	"axe": "Chop trees faster.",
+	"rope": "Used for crafting.",
+	"carpet": "Decorative.",
+	"door": "Lets you pass through walls.",
+	"trap": "Catches animals.",
+	"shovel": "Dig up tiles.",
+	"cauldron": "Cook food.",
+	"knife": "Cut things.",
+	"whistle": "Call animals.",
+	"hat": "Wearable.",
+	"gloves": "Wearable.",
+	"scarecrow": "Scares animals."
 }
 
 var crafting_page := 0
@@ -617,7 +618,7 @@ func update_inventory_ui():
 				texture_rect.modulate = Color(1, 1, 1, 1)
 
 			# Only connect for placeable items (after all setup)
-			if item_name == "campfire" or item_name == "wall":
+			if item_name == "campfire" or item_name == "wall" or item_name == "crafting_table":
 				texture_rect.gui_input.connect(func(event):
 					if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
 						var current_items = []
@@ -799,6 +800,15 @@ func place_object_on_tile(item_name, tile):
 		inventory[item_name] -= 1
 		update_inventory_ui()
 		update_quick_bar()
+	elif item_name == "crafting_table":
+		var table = craftingtab_scene.instantiate()
+		table.name = "Table_%s_%s"  % [tile.x, tile.y]
+		table.add_to_group("tables")
+		table.position = tilemap.map_to_local(tile) # Ensure correct world position
+		tilemap.add_child(table)
+		inventory[item_name] -= 1
+		update_inventory_ui()
+		update_quick_bar()
 
 	_inventory_version += 1 # Increment inventory version after placing an object
 
@@ -867,7 +877,8 @@ func update_fog_of_war():
 
 func is_blocker(tilemap, pos):
 	var tile_type = tilemap.get_cell_source_id(0, pos)
-	return tile_type == TILE_FOREST or tile_type == TILE_MOUNTAIN
+	if tile_type == TILE_MOUNTAIN:
+		return inventory.get("rope", 0) <= 0
 
 
 #--------------SPAWN RELATED  ---------------------------
@@ -1174,7 +1185,7 @@ func _input(event):
 				# Space bar or accept: select item for placement if placeable and focused in inventory (do NOT place yet)
 				if selected_inventory_index < items.size():
 					var selected_item_name = items[selected_inventory_index]
-					if selected_item_name == "campfire" or selected_item_name == "wall":
+					if selected_item_name == "campfire" or selected_item_name == "wall" or selected_item_name == "crafting_table":
 						is_placing = true
 						placing_item = selected_item_name
 						$UI/InventoryWindow.visible = false
@@ -1380,11 +1391,38 @@ func play_ui_sound():
 
 func _on_inventory_button_pressed() -> void:
 	play_ui_sound()
+	var tilemap = $NavigationRegion2D/TileMap
+	var player_tile = tilemap.local_to_map(player.position)
+	# Check for adjacent crafting table
+	var adjacent_has_table = false
+	var directions = [Vector2i(0,0), Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
+	for dir in directions:
+		var check_tile = player_tile + dir
+		var check_pos = tilemap.map_to_local(check_tile)
+		for table in get_tree().get_nodes_in_group("tables"):
+			if table.position.distance_to(check_pos) < 32: # half tile size, adjust if needed
+				adjacent_has_table = true
+				break
+		if adjacent_has_table:
+			break
+	# Show inventory and the correct crafting window
 	$UI/InventoryWindow.visible = not $UI/InventoryWindow.visible
-	$UI/CraftingBookWindow.visible = $UI/InventoryWindow.visible
 	if $UI/InventoryWindow.visible:
 		selected_recipe_index = 0
-
+		if adjacent_has_table:
+			if $UI.has_node("CraftingTableWindow"):
+				$UI/CraftingTableWindow.visible = true
+				if has_method("update_crafting_table_recipes"):
+					update_crafting_table_recipes()
+			$UI/CraftingBookWindow.visible = false
+		else:
+			$UI/CraftingBookWindow.visible = true
+			if $UI.has_node("CraftingTableWindow"):
+				$UI/CraftingTableWindow.visible = false
+	else:
+		$UI/CraftingBookWindow.visible = false
+		if $UI.has_node("CraftingTableWindow"):
+			$UI/CraftingTableWindow.visible = false
 	update_inventory_ui()
 
 func _on_harvest_button_pressed() -> void:
@@ -1398,12 +1436,15 @@ func _on_harvest_button_pressed() -> void:
 			forest_harvest_counts[player_tile] = 0
 		forest_harvest_counts[player_tile] += 1
 		var rand = randi() % 100
+		var axe_bonus = 1
+		if inventory.get("axe", 0) > 0:
+			axe_bonus = 3
 		if rand < 80:
-			inventory["stick"] += 1
+			inventory["stick"] += axe_bonus
 			print("You found a stick! Total sticks: %d" % inventory["stick"])
 	
 		else:
-			inventory["big_stick"] += 1
+			inventory["big_stick"] += axe_bonus
 			print("You found a big stick! Total big sticks: %d" % inventory["big_stick"])
 		if forest_harvest_counts[player_tile] > 4: # 5 harvest max
 			var max_radius = 20 # You can set this to the number of tiles that covers your screen
@@ -1508,3 +1549,90 @@ func swap_inventory_slots(from_index: int, to_index: int) -> void:
 	inventory_order[to_index] = temp
 	update_inventory_ui()
 	update_quick_bar()
+
+
+func update_crafting_table_recipes():
+	var recipe_icons = ["campfire", "wall", "big_stick","crafting_table", "rope", "shovel", "axe", "hat"]
+	var recipe_grid = $UI/CraftingTableWindow/RecipeGrid
+	# Clear previous icons
+	for child in recipe_grid.get_children():
+		child.queue_free()
+	# Show at most 8 icons
+	var max_icons = 8
+	for i in range(min(recipe_icons.size(), max_icons)):
+		var icon_name = recipe_icons[i]
+		# Create a colored background for the icon cell
+		var bg = ColorRect.new()
+		bg.color = Color(0.72, 0.35, 0.14, 1) # Brown, fully opaque
+		
+		bg.custom_minimum_size = Vector2(64, 64)
+		bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bg.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		recipe_grid.add_child(bg)
+		# Add the icon as a child of the background
+		var icon = TextureRect.new()
+		var tex = item_icons.get(icon_name, null)
+		print("Icon for ", icon_name, ": ", tex)
+		icon.texture = tex
+		icon.expand = true
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		icon.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		icon.custom_minimum_size = Vector2(64, 64)
+		icon.tooltip_text = icon_name.capitalize().replace("_"," ")
+		bg.add_child(icon)
+		
+		icon.gui_input.connect(func(event):
+			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+					if can_craft(icon_name) :
+						craft_item(icon_name)
+						play_ui_sound()
+						update_inventory_ui()
+						update_crafting_table_recipes()
+		)
+		# If texture is missing, show a label
+		if tex == null:
+			var missing = Label.new()
+			missing.text = icon_name
+			missing.modulate = Color(1,0,0)
+			bg.add_child(missing)
+		# put requirement here  -> icon img + labeltext
+		
+		#bg part 
+		var req_bg = ColorRect.new()
+		req_bg.color = Color(0.72, 0.35, 0.14, 1) #brown bg case
+		req_bg.custom_minimum_size = Vector2(400,64)
+		req_bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		req_bg.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		
+		#logic counting part
+		var req_items = recipes[icon_name]
+		var req_counts = {} #how many 
+		for req in req_items:
+			req_counts[req] = req_counts.get(req,0) + 1
+		var req_container = HBoxContainer.new()
+		req_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		req_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		
+		for req_item in req_counts.keys():
+			var req_icon = TextureRect.new()
+			req_icon.texture = item_icons.get(req_item, null)
+			req_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			req_icon.custom_minimum_size = Vector2(32,32)
+			req_icon.tooltip_text = req_item.capitalize().replace("_"," ")
+			req_container.add_child(req_icon)
+			var req_label = Label.new()
+			req_label.text = "x%d" % req_counts[req_item]
+			req_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			#change color if not enough 
+			var have = inventory.get(req_item, 0)
+			var need = req_counts[req_item]
+			if have < need:
+				req_label.add_theme_color_override("font_color",Color(1,0,0,1))
+			else :
+				req_label.add_theme_color_override("font_color",Color(0,0,0,1))
+			req_container.add_child(req_label)
+		
+		
+		req_bg.add_child(req_container)
+		recipe_grid.add_child(req_bg)

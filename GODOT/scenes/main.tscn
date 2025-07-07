@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://pfmbets05ulg"]
+[gd_scene load_steps=15 format=3 uid="uid://pfmbets05ulg"]
 
 [ext_resource type="Script" uid="uid://vheosc3x2hvu" path="res://script/main.gd" id="1_jyhfs"]
 [ext_resource type="TileSet" uid="uid://ddrgf4g0fv8o" path="res://tiles/terrain_tileset.tres" id="1_o5qli"]
@@ -16,6 +16,9 @@ corner_radius_bottom_left = 10
 
 [sub_resource type="SystemFont" id="SystemFont_sugp2"]
 font_italic = true
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_o6xl0"]
+bg_color = Color(0.419608, 0.239216, 0, 0.843137)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tbgi4"]
 bg_color = Color(0.72549, 0.352941, 0.14902, 1)
@@ -109,6 +112,27 @@ offset_right = 20.0
 offset_bottom = 20.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="CraftingTableWindow" type="Panel" parent="UI"]
+visible = false
+custom_minimum_size = Vector2(64, 64)
+anchors_preset = -1
+anchor_top = 0.022
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = -6.10352e-05
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_o6xl0")
+
+[node name="RecipeGrid" type="GridContainer" parent="UI/CraftingTableWindow"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.073
+anchor_top = 0.049
+anchor_right = 0.128
+anchor_bottom = 0.082
+columns = 2
 
 [node name="CraftingBookWindow" type="Panel" parent="UI"]
 visible = false

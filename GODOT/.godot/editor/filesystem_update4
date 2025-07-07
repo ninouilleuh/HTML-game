@@ -19,3 +19,4 @@ res://script/map_generator.gd
 res://script/pig.gd
 res://script/InventorySlotDrag.gd
 res://script/goat.gd
+res://script/player.gd
