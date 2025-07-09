@@ -33,13 +33,12 @@ text = "                                                         CONTROLS
 Move:     WASD
 Harvest :   [E] 
 Open Inventory: [I]
-Open Crafting:  [B]
-Place Item:     [Enter]    (when placing)
-Craft:    [E] (in crafting book)
+Place Item, craft :     [Space Bar] 
+Pickup placed Item : [X] then [Space Bar]
 Select Item :   Arrow keys
 Save:       [F1]
 New Game:    Mouse Click [New Game] on Game Over screen
 
 Tip: Place campfires to light up the night and clear fog!
 
-PRESS [ENTER] to CONTINUE."
+PRESS [SPACE BAR] to CONTINUE."

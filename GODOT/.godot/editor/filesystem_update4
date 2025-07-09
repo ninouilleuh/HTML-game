@@ -2,9 +2,6 @@ res://scenes/main.tscn
 res://tiles/terrain_tileset.tres
 res://shaders/campfire.gdshader
 res://shaders/fog.gdshader
-res://script/main.gd
-res://crafting_table.tscn
-res://scenes/placeable/crafting_table.tscn
 res://scenes/player.tscn
 res://scenes/InventorySlot.tscn
 res://scenes/ennemies/pig.tscn
@@ -15,8 +12,5 @@ res://scenes/ennemies/goat.tscn
 res://scenes/tutorial_screen.tscn
 res://scenes/caves.tscn
 res://scenes/reed.tscn
-res://script/map_generator.gd
-res://script/pig.gd
-res://script/InventorySlotDrag.gd
-res://script/goat.gd
-res://script/player.gd
+res://scenes/placeable/crafting_table.tscn
+res://script/main.gd

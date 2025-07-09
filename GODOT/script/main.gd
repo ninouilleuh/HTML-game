@@ -8,8 +8,9 @@ var day := 1
 const HOURS_PER_DAY := 24
 const SECONDS_PER_HOUR := 60.0 # 1 hour = 1 minute real time
 # Dictionaries
-var inventory = {"stick" : 0, "big_stick":50, "salt":0, "reed":10
+var inventory = {"stick" : 0, "big_stick":0, "salt":0, "reed":0
 }
+var selected_table_recipe_index := 0
 var item_icons = {
 	"stick": preload("res://assets/items/stick.png"),
 	"big_stick": preload("res://assets/items/big_stick.png"),
@@ -69,7 +70,7 @@ var craftingtab_scene = preload("res://scenes/placeable/crafting_table.tscn")
 const TILE_MOUNTAIN = 5
 const TILE_GRASS = 2 # Use your actual grass tile ID
 # Cave entrance tile ID (choose a unique unused tile ID)
-const TILE_HILL = 8 # Set this to the correct tile ID for hill tiles
+const TILE_HILL = 3 # Set this to the correct tile ID for hill tiles
 const TILE_SALTFLATS = 15 # Set this to the correct tile ID for saltflats
 # Cave entrance tile ID (choose a unique unused tile ID)
 const TILE_CAVE_ENTRANCE = 20
@@ -362,19 +363,19 @@ func _process(delta):
 
 	# --- CAVE ENTRANCE HANDLING ---
 	if tile_type == TILE_CAVE_ENTRANCE and not has_node("caves"):
-		print("Entering cave at ", player_tile)
-		for pig in pigs:
-			pig.queue_free()
-		pigs.clear()
-		for goat in goats:
-			goat.queue_free()
-		goats.clear()
-		var caves_scene = preload("res://scenes/caves.tscn").instantiate()
-		caves_scene.name = "caves"
-		add_child(caves_scene)
-		if caves_scene.has_method("enter_cave"):
-			caves_scene.enter_cave(player)
-
+		#print("Entering cave at ", player_tile)
+		#for pig in pigs:
+		#	pig.queue_free()
+		#pigs.clear()
+		#for goat in goats:
+		#	goat.queue_free()
+		#goats.clear()
+		#var caves_scene = preload("res://scenes/caves.tscn").instantiate()
+		#caves_scene.name = "caves"
+		#add_child(caves_scene)
+		#if caves_scene.has_method("enter_cave"):
+		#	caves_scene.enter_cave(player)
+		pass
 	# --- TIME ADVANCE ---
 	time_of_day += delta / SECONDS_PER_HOUR
 	if time_of_day >= HOURS_PER_DAY:
@@ -448,24 +449,6 @@ func _process(delta):
 	if inventory_open and is_deconstructing:
 		is_deconstructing = false
 		update_mode_indicator()
-
-	# --- Number key shortcuts for building mode (1-5) ---
-	for i in range(5):
-		if Input.is_key_pressed(KEY_1 + i):
-			var current_items = []
-			for n in inventory_order:
-				if inventory.has(n) and inventory[n] > 0:
-					current_items.append(n)
-			for n in inventory.keys():
-				if inventory[n] > 0 and not inventory_order.has(n):
-					current_items.append(n)
-			if i < current_items.size():
-				var item_name = current_items[i]
-				if item_name == "campfire" or item_name == "wall" or item_name == "crafting_table":
-					is_placing = true
-					placing_item = item_name
-					$UI/InventoryWindow.visible = false
-					update_mode_indicator() # Show building mode label immediately
 
 	# --- CAMPFIRE SHADER UPDATE ---
 	var camera = get_viewport().get_camera_2d()
@@ -618,7 +601,7 @@ func update_inventory_ui():
 				texture_rect.modulate = Color(1, 1, 1, 1)
 
 			# Only connect for placeable items (after all setup)
-			if item_name == "campfire" or item_name == "wall" or item_name == "crafting_table":
+			if item_name == "campfire" or item_name == "wall" or item_name == "crafting_table" or item_name == "shovel":
 				texture_rect.gui_input.connect(func(event):
 					if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
 						var current_items = []
@@ -629,11 +612,14 @@ func update_inventory_ui():
 							if inventory[n] > 0 and not inventory_order.has(n):
 								current_items.append(n)
 						if i < current_items.size():
-							is_placing = true
-							placing_item = current_items[i]
-							$UI/InventoryWindow.visible = false
-							$UI/CraftingBookWindow.visible = false
-							update_mode_indicator()
+							if item_name == "shovel":
+								use_shovel_on_tile()
+							else :
+								is_placing = true
+								placing_item = current_items[i]
+								$UI/InventoryWindow.visible = false
+								$UI/CraftingBookWindow.visible = false
+								update_mode_indicator()
 				)
 		else:
 			texture_rect.texture = null
@@ -814,7 +800,7 @@ func place_object_on_tile(item_name, tile):
 
 
 #-------------------- FOG OF WAR -----------------
-func compute_fov(tilemap: TileMap, origin: Vector2i, radius: int, is_blocker: Callable) -> Dictionary:
+func compute_fov(tilemap: TileMap, origin: Vector2i, radius: int, is_fog_blocker: Callable) -> Dictionary:
 	var visible := {}
 	visible[origin] = true
 	for angle in range(0, 360, 1): # Use 1-degree steps for better coverage
@@ -826,14 +812,14 @@ func compute_fov(tilemap: TileMap, origin: Vector2i, radius: int, is_blocker: Ca
 			if visible.has(pos):
 				continue # Already checked this tile
 			visible[pos] = true
-			if is_blocker(tilemap, pos):
+			if is_fog_blocker(tilemap, pos):
 				break
 	return visible
 func update_fog_of_war():
 	var tilemap = $NavigationRegion2D/TileMap
 	var fog_tilemap = $NavigationRegion2D/FogTileMap
 	var player_tile = tilemap.local_to_map(player.position)
-	var fov_tiles = compute_fov(tilemap, player_tile, 32.9, is_blocker)
+	var fov_tiles = compute_fov(tilemap, player_tile, 32.9, is_fog_blocker)
 
 	# 1. Cover all loaded chunk tiles with fog
 	for chunk_coords in tilemap.active_chunks.keys():
@@ -880,6 +866,14 @@ func is_blocker(tilemap, pos):
 	if tile_type == TILE_MOUNTAIN:
 		return inventory.get("rope", 0) <= 0
 
+func is_fog_blocker(tilemap,pos):
+	var tile_type = tilemap.get_cell_source_id(0, pos)
+	if tile_type == TILE_MOUNTAIN:
+		return true
+	elif tile_type == TILE_FOREST:
+		return true
+	return false
+	
 
 #--------------SPAWN RELATED  ---------------------------
 # PLAYER POSITION
@@ -1100,14 +1094,10 @@ func load_game():
 
 # -----------------------INPUT MANAGEMENT -------------
 func _input(event):
-
-	print("[DEBUG] _input called. event=", event)
 	if event.is_action_pressed("ui_save"):
 		save_game()
 	if event.is_action_pressed("inventory"):
 		_on_inventory_button_pressed()
-#   if event.is_action_pressed("build"):
-		#_on_crafting_book_button_pressed()
 	if event.is_action_pressed("deconstruction"):
 		# Only allow toggling deconstruction mode if inventory is not visible
 		if not $UI/InventoryWindow.visible:
@@ -1126,6 +1116,7 @@ func _input(event):
 	# --- INVENTORY/CRAFTING BOOK KEYBOARD NAVIGATION ---
 	var inventory_open = $UI/InventoryWindow.visible
 	var crafting_open = $UI/CraftingBookWindow.visible
+	var craftingtab_open = $UI/CraftingTableWindow.visible
 	if crafting_open and event.is_action_pressed("ui_tab"):
 		ui_focus = "crafting_book"
 		selected_recipe_index = 0
@@ -1146,6 +1137,8 @@ func _input(event):
 		var num_rows = int(ceil(float(num_items) / slots_per_row))
 		var row = int(selected_inventory_index / slots_per_row)
 		var col = int(selected_inventory_index % slots_per_row)
+		var recipe_icons = ["campfire","wall","big_stick","crafting_table","rope","shovel","axe","hat"]
+		var max_index = recipe_icons.size() -1
 		if ui_focus == "inventory":
 			print("focus inventory")
 			if event.is_action_pressed("ui_left"):
@@ -1161,6 +1154,14 @@ func _input(event):
 						play_ui_sound()
 						update_recipe_icon_highlight()
 						update_inventory_ui()
+					if craftingtab_open :
+						ui_focus = "crafting_table"
+						selected_table_recipe_index = 0
+						play_ui_sound()
+						#update highlight
+						update_crafting_table_highlight()
+						update_inventory_ui()
+						
 			elif event.is_action_pressed("ui_right"):
 				if col < slots_per_row - 1 and selected_inventory_index + 1 < num_items:
 					selected_inventory_index = min(num_items - 1, selected_inventory_index + 1)
@@ -1213,7 +1214,7 @@ func _input(event):
 				print("[DEBUG] Key event in crafting_book focus: keycode=", event.keycode, " pressed=", event.pressed)
 				if event.pressed and event.keycode == 32:
 					print("[DEBUG] SPACE key event detected in crafting_book focus.")
-					var recipe_icons = ["campfire", "wall", "big_stick", "crafting_table"]
+					recipe_icons = ["campfire", "wall", "big_stick", "crafting_table"]
 					print("[DEBUG] selected_recipe_index=", selected_recipe_index)
 					if selected_recipe_index >= 0 and selected_recipe_index < recipe_icons.size():
 						var recipe_name = recipe_icons[selected_recipe_index]
@@ -1229,15 +1230,60 @@ func _input(event):
 						print("[DEBUG] selected_recipe_index out of range!")
 			elif event.is_action_pressed("ui_accept"): 
 				# Space bar or select: craft the selected recipe if possible
-				var recipe_icons = ["campfire", "wall", "big_stick", "crafting_table"]
+				recipe_icons = ["campfire", "wall", "big_stick", "crafting_table"]
 				if selected_recipe_index >= 0 and selected_recipe_index < recipe_icons.size():
 					var recipe_name = recipe_icons[selected_recipe_index]
 					if can_craft(recipe_name):
 						craft_item(recipe_name)
 						play_ui_sound()
 						update_inventory_ui()
-# --- Visually highlight the selected recipe icon in the crafting book ---
+	
+		elif ui_focus == "crafting_table":
+			if event.is_action_pressed("ui_down"):
+				selected_table_recipe_index = min(selected_table_recipe_index + 1, max_index)
+				play_ui_sound()
+				update_crafting_table_highlight()
+			elif event.is_action_pressed("ui_up"):
+				selected_table_recipe_index = max(selected_table_recipe_index -1, 0)
+				play_ui_sound()
+				update_crafting_table_highlight()
+			elif event.is_action_pressed("accept"):
+				var recipe_name = recipe_icons[selected_table_recipe_index]
+				if can_craft(recipe_name):
+					craft_item(recipe_name)
+					play_ui_sound()
+					update_inventory_ui()
+					update_crafting_table_recipes()
+			elif event.is_action_pressed("ui_right"):
+				var has_item = false
+				for item_name in inventory.keys():
+					if inventory[item_name] > 0:
+						has_item = true
+						break
+				if has_item :
+					ui_focus = "inventory"
+					play_ui_sound()
+					update_inventory_ui()
 
+	# --- Number key shortcuts for building mode (1-5) ---
+	for i in range(5):
+		if Input.is_key_pressed(KEY_1 + i):
+			var current_items = []
+			for n in inventory_order:
+				if inventory.has(n) and inventory[n] > 0:
+					current_items.append(n)
+			for n in inventory.keys():
+				if inventory[n] > 0 and not inventory_order.has(n):
+					current_items.append(n)
+			if i < current_items.size():
+				var item_name = current_items[i]
+				if item_name == "shovel" :
+					use_shovel_on_tile()
+				elif item_name == "campfire" or item_name == "wall" or item_name == "crafting_table":
+					is_placing = true
+					placing_item = item_name
+					$UI/InventoryWindow.visible = false
+					update_mode_indicator() # Show building mode label immediately
 	# --- DECONSTRUCTION SELECTION (E) ---
 	if is_deconstructing and event.is_action_pressed("action"):
 		update_mode_indicator()
@@ -1252,6 +1298,9 @@ func _input(event):
 			for wall in tilemap.get_children():
 				if wall.is_in_group("walls") and wall.position.distance_to(check_pos) < 2.0:
 					deconstruct_candidates.append({"node": wall, "type": "wall", "tile": check_tile, "pos": wall.position})
+			for table in get_tree().get_nodes_in_group("tables"):
+				if table.position.distance_to(check_pos) < 2.0:
+					deconstruct_candidates.append({"node": table, "type": "table", "tile": check_tile, "pos": table.position})
 			for campfire in get_tree().get_nodes_in_group("campfires"):
 				var campfire_tile = tilemap.local_to_map(campfire.position)
 				if campfire_tile == check_tile:
@@ -1301,6 +1350,9 @@ func _input(event):
 				var campfire_tile = tilemap.local_to_map(campfire.position)
 				if campfire_tile == check_tile:
 					deconstruct_candidates.append({"node": campfire, "type": "campfire", "tile": check_tile, "pos": campfire.position})
+			for table in get_tree().get_nodes_in_group("tables"):
+				if table.position.distance_to(check_pos) < 2.0:
+					deconstruct_candidates.append({"node": table, "type": "table", "tile": check_tile, "pos": table.position})
 		if deconstruct_candidates.size() == 0:
 			if deconstruct_highlight:
 				deconstruct_highlight.queue_free()
@@ -1326,6 +1378,18 @@ func _input(event):
 		deconstruct_candidates.clear()
 		deconstruct_selected_idx = 0
 
+
+
+func update_crafting_table_highlight():
+	var recipe_grid = $UI/CraftingTableWindow/RecipeGrid
+	var recipe_icons = ["campfire","wall","big_stick","crafting_table","rope","shovel","axe","hat"]
+	for i in range(recipe_icons.size()):
+		var icon_bg = recipe_grid.get_child(i * 2)
+		if icon_bg is ColorRect:
+			if i == selected_table_recipe_index and ui_focus == "crafting_table":
+				icon_bg.color = Color(1,1,0.2,0.7)
+			else:
+				icon_bg.color = Color(0.72,0.35,0.14,1)
 
 func update_recipe_icon_highlight():
 	var recipe_icons = ["campfire", "wall", "big_stick", "crafting_table"]
@@ -1372,6 +1436,11 @@ func _deconstruct_object(obj):
 		if not inventory.has("campfire"):
 			inventory["campfire"] = 0
 		inventory["campfire"] += 1
+	elif obj.type == "table":
+		obj.node.queue_free()
+		if not inventory.has("crafting_table"):
+			inventory["crafting_table"] = 0
+		inventory["crafting_table"] += 1
 	update_inventory_ui()
 	update_quick_bar()
 
@@ -1423,6 +1492,10 @@ func _on_inventory_button_pressed() -> void:
 		$UI/CraftingBookWindow.visible = false
 		if $UI.has_node("CraftingTableWindow"):
 			$UI/CraftingTableWindow.visible = false
+	
+	if ui_focus == "crafting_book" and not $UI/CraftingBookWindow.visible or ui_focus == "crafting_table" and not $UI/CraftingTableWindow.visible :
+		ui_focus = "inventory"
+	
 	update_inventory_ui()
 
 func _on_harvest_button_pressed() -> void:
@@ -1636,3 +1709,19 @@ func update_crafting_table_recipes():
 		
 		req_bg.add_child(req_container)
 		recipe_grid.add_child(req_bg)
+
+
+func use_shovel_on_tile():
+	var tilemap = $NavigationRegion2D/TileMap
+	var player_tile = tilemap.local_to_map(player.position)
+	var tile_type = tilemap.get_cell_source_id(0,player_tile)
+	if tile_type == TILE_GRASS:
+		tilemap.set_cell(0, player_tile, TILE_HILL, Vector2i(0, 0), 0)
+		tilemap.modified_tiles[player_tile] = TILE_HILL
+		print("[DEBUG]: Grass turned to hill ! ")
+	elif tile_type == TILE_HILL:
+		tilemap.set_cell(0,player_tile,TILE_GRASS, Vector2i(0,0),0)
+		tilemap.modified_tiles[player_tile] = TILE_GRASS
+		print("[DEBUG]: Hill turned to grass ! ")
+	else :
+		print ("shovel can only be used on grass or hills")	
