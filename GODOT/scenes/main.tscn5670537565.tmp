@@ -88,7 +88,7 @@ offset_top = -15.5
 offset_right = 69.0
 offset_bottom = 15.5
 grow_vertical = 2
-text = "Harvest (e)"
+text = "Harvest"
 
 [node name="InventoryButton" type="Button" parent="UI"]
 anchors_preset = -1
@@ -98,7 +98,7 @@ anchor_right = 0.984
 anchor_bottom = 0.961
 grow_horizontal = 0
 grow_vertical = 0
-text = "Inventory (i)"
+text = "Inventory"
 
 [node name="QuickBar" type="HBoxContainer" parent="UI"]
 anchors_preset = -1

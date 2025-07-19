@@ -1186,12 +1186,16 @@ func _input(event):
 				if selected_inventory_index < items.size():
 					var selected_item_name = items[selected_inventory_index]
 					if inventory.has(selected_item_name) and inventory[selected_item_name] > 0:
-						inventory[selected_item_name] -= 1
-						if inventory[selected_item_name] <= 0:
-							inventory[selected_item_name] = 0
-						play_ui_sound()
-						update_inventory_ui()
-						update_quick_bar()
+						var slot = slot_container.get_child(selected_inventory_index)
+						var slot_screen_pos = slot.get_global_rect().position
+						prompt_delete_item(selected_item_name, inventory[selected_item_name], func(amount):
+							inventory[selected_item_name] -= amount
+							if inventory[selected_item_name] < 0:
+								inventory[selected_item_name] = 0
+							play_ui_sound()
+							update_inventory_ui()
+							update_quick_bar()
+						, slot_screen_pos)
 			elif Input.is_action_just_released("accept") :
 				# Space bar or accept: select item for placement if placeable and focused in inventory (do NOT place yet)
 				if selected_inventory_index < items.size():
@@ -1362,7 +1366,7 @@ func _input(event):
 					deconstruct_candidates.append({"node": campfire, "type": "campfire", "tile": check_tile, "pos": campfire.position})
 			for table in get_tree().get_nodes_in_group("tables"):
 				if table.position.distance_to(check_pos) < 2.0:
-					deconstruct_candidates.append({"node": table, "type": "table", "tile": check_tile, "pos": table.position})
+					deconstruct_candidates.append({"node": table, "type": "table", "tile": check_pos, "pos": table.position})
 		if deconstruct_candidates.size() == 0:
 			if deconstruct_highlight:
 				deconstruct_highlight.queue_free()
@@ -1679,7 +1683,7 @@ func update_crafting_table_recipes():
 			missing.text = icon_name
 			missing.modulate = Color(1,0,0)
 			bg.add_child(missing)
-		# put requirement here  -> icon img + labeltext
+		#put requirement here  -> icon img + labeltext
 		
 		#bg part 
 		var req_bg = ColorRect.new()
@@ -1735,3 +1739,72 @@ func use_shovel_on_tile():
 		print("[DEBUG]: Hill turned to grass ! ")
 	else :
 		print ("shovel can only be used on grass or hills")	
+
+
+func prompt_delete_item(item_name: String, max_amount: int, callback: Callable, slot_screen_pos = null):
+	var popup = PopupPanel.new()
+	popup.name = "DeleteItemPopup"
+
+	var vbox = VBoxContainer.new()
+	vbox.custom_minimum_size = Vector2(220, 0)
+
+	var label = Label.new()
+	label.text = "How many %s to throw away? (Max: %d)" % [item_name.capitalize(), max_amount]
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(label)
+
+	var value_label = Label.new()
+	value_label.text = "1"
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(value_label)
+
+	var slider = HSlider.new()
+	slider.min_value = 1
+	slider.max_value = max_amount
+	slider.step = 1
+	slider.value = 1
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(180, 0)
+	vbox.add_child(slider)
+
+	slider.value_changed.connect(func(val):
+		value_label.text = "%d" % int(val)
+	)
+
+	var button = Button.new()
+	button.text = "Delete"
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vbox.add_child(button)
+
+	var do_delete = func():
+		callback.call(int(slider.value))
+		popup.queue_free()
+
+	button.pressed.connect(do_delete)
+
+	# Keyboard/gamepad support for slider and delete
+	vbox.focus_mode = Control.FOCUS_ALL
+	slider.focus_mode = Control.FOCUS_ALL
+	button.focus_mode = Control.FOCUS_ALL
+
+	popup.add_child(vbox)
+	get_tree().get_root().add_child(popup)
+
+	# Position the popup below the item slot if slot_screen_pos is provided
+	if slot_screen_pos != null:
+		popup.popup()
+		await get_tree().process_frame # Wait for popup to layout
+		var popup_size = popup.size
+		popup.position = slot_screen_pos + Vector2(-popup_size.x/2, 64) # 64px below slot, center horizontally
+	else:
+		popup.popup_centered()
+		await get_tree().process_frame
+
+	slider.grab_focus()
+
+	# Allow space/enter to trigger delete while slider is focused
+	slider.gui_input.connect(func(event):
+		if event is InputEventKey and event.pressed:
+			if event.keycode == KEY_SPACE or event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+				do_delete.call()
+	)
