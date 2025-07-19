@@ -1182,6 +1182,16 @@ func _input(event):
 					selected_inventory_index = max(0, selected_inventory_index - slots_per_row)
 				play_ui_sound()
 				update_inventory_ui()
+			elif event.is_action_pressed("ui_cancel"):
+				if selected_inventory_index < items.size():
+					var selected_item_name = items[selected_inventory_index]
+					if inventory.has(selected_item_name) and inventory[selected_item_name] > 0:
+						inventory[selected_item_name] -= 1
+						if inventory[selected_item_name] <= 0:
+							inventory[selected_item_name] = 0
+						play_ui_sound()
+						update_inventory_ui()
+						update_quick_bar()
 			elif Input.is_action_just_released("accept") :
 				# Space bar or accept: select item for placement if placeable and focused in inventory (do NOT place yet)
 				if selected_inventory_index < items.size():
