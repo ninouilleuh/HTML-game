@@ -8,7 +8,7 @@ var day := 1
 const HOURS_PER_DAY := 24
 const SECONDS_PER_HOUR := 60.0 # 1 hour = 1 minute real time
 # Dictionaries
-var inventory = {"stick" : 0, "big_stick":0, "salt":0, "reed":0
+var inventory = {"stick" : 0, "big_stick":0, "salt":0, "reed":0,"trap":1
 }
 var selected_table_recipe_index := 0
 var item_icons = {
@@ -67,6 +67,7 @@ const WORLD_MIN = -5000
 const WORLD_MAX = 5000
 var wall_scene = preload("res://scenes/placeable/wall.tscn")
 var craftingtab_scene = preload("res://scenes/placeable/crafting_table.tscn")
+var trap_scene = preload("res://scenes/placeable/trap.tscn")
 const TILE_MOUNTAIN = 5
 const TILE_GRASS = 2 # Use your actual grass tile ID
 # Cave entrance tile ID (choose a unique unused tile ID)
@@ -601,7 +602,7 @@ func update_inventory_ui():
 				texture_rect.modulate = Color(1, 1, 1, 1)
 
 			# Only connect for placeable items (after all setup)
-			if item_name == "campfire" or item_name == "wall" or item_name == "crafting_table" or item_name == "shovel":
+			if item_name == "campfire" or item_name == "wall" or item_name == "crafting_table" or item_name == "shovel" or item_name == "trap":
 				texture_rect.gui_input.connect(func(event):
 					if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
 						var current_items = []
@@ -795,7 +796,15 @@ func place_object_on_tile(item_name, tile):
 		inventory[item_name] -= 1
 		update_inventory_ui()
 		update_quick_bar()
-
+	elif item_name == "trap":
+		var trap = trap_scene.instantiate()
+		trap.position = tilemap.map_to_local(tile)
+		trap.name = "Trap_%s_%s" % [tile.x, tile.y]
+		trap.add_to_group("Traps")
+		tilemap.add_child(trap)
+		inventory[item_name] -= 1
+		update_inventory_ui()
+		update_quick_bar()
 	_inventory_version += 1 # Increment inventory version after placing an object
 
 
@@ -1293,7 +1302,7 @@ func _input(event):
 				var item_name = current_items[i]
 				if item_name == "shovel" :
 					use_shovel_on_tile()
-				elif item_name == "campfire" or item_name == "wall" or item_name == "crafting_table":
+				elif item_name == "campfire" or item_name == "wall" or item_name == "crafting_table" or item_name == "trap":
 					is_placing = true
 					placing_item = item_name
 					$UI/InventoryWindow.visible = false

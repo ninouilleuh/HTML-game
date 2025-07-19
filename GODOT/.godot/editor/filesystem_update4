@@ -14,3 +14,6 @@ res://scenes/caves.tscn
 res://scenes/reed.tscn
 res://scenes/placeable/crafting_table.tscn
 res://script/main.gd
+res://scenes/trap.tscn
+res://script/trap.gd
+res://scenes/placeable/trap.tscn
