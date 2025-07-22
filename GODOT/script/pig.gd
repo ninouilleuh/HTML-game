@@ -38,6 +38,8 @@ var main = null
 var is_savior := false
 var is_waiting_for_saviors := false
 var is_being_saved := false
+var is_escaping := false
+var escape_tile = null
 var savior_group := []
 var savior_target = null
 var savior_timer := 0.0
@@ -62,6 +64,15 @@ func _process(delta):
 	# Do NOT call move_and_slide() here anymore
 
 func _physics_process(delta):
+	if is_escaping and escape_tile != null:
+		var escape_pos = tilemap.map_to_local(escape_tile)
+		var dir = (escape_pos - position).normalized()
+		velocity = dir * speed
+		move_and_slide()
+		if position.distance_to(escape_pos) < 8.0:
+			is_escaping = false
+			escape_tile = null
+		return
 	if not is_instance_valid(player) or not is_instance_valid(navigation):
 		return
 	if player and navigation:
@@ -508,3 +519,6 @@ func get_closest_pig():
 			closest_dist = d
 			closest_pig = pig
 	return closest_pig
+
+func is_pig():
+	return true

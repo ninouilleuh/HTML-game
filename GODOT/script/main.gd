@@ -1,4 +1,6 @@
 extends Node2D
+# Persistent inventory key binding
+var config_path := "user_settings.cfg"
 
 # player
 var player
@@ -8,9 +10,10 @@ var day := 1
 const HOURS_PER_DAY := 24
 const SECONDS_PER_HOUR := 60.0 # 1 hour = 1 minute real time
 # Dictionaries
-var inventory = {"stick" : 0, "big_stick":0, "salt":0, "reed":0,"trap":1
+var inventory = {"stick" : 0, "big_stick":0, "salt":0, "reed":0,"trap":0
 }
 var selected_table_recipe_index := 0
+
 var item_icons = {
 	"stick": preload("res://assets/items/stick.png"),
 	"big_stick": preload("res://assets/items/big_stick.png"),
@@ -54,20 +57,22 @@ var recipes = {
 var unloaded_pigs := {} # Key: chunk_coords, Value: Array of pig data (e.g., positions)
 var unloaded_campfires := {} # Key: chunk_coords, Value: Array of campfire data (e.g., positions)
 var unloaded_goats := {} # Key: chunk_coords, Value: Array of goat data (position, demonic, demonic_timer)
+var unloaded_bunnies := {} # Key: chunk_coords, Value: Array of bunny positions
 var unloaded_reed := {}
 var unloaded_walls := {}
 var forest_harvest_counts := {} # Key: Vector2i(tile_pos), Value: int
+var bunnies = []
 # Instanciate
 var slot_scene := preload("res://scenes/InventorySlot.tscn")
 var pig_scene = preload("res://scenes/ennemies/pig.tscn")
 var goat_scene = preload("res://scenes/ennemies/goat.tscn")
+var bunny_scene = preload("res://scenes/ennemies/bunny.tscn")
 #TILE AND MAP RELATED 
 const TILE_FOREST = 0 
 const WORLD_MIN = -5000
 const WORLD_MAX = 5000
 var wall_scene = preload("res://scenes/placeable/wall.tscn")
 var craftingtab_scene = preload("res://scenes/placeable/crafting_table.tscn")
-var trap_scene = preload("res://scenes/placeable/trap.tscn")
 const TILE_MOUNTAIN = 5
 const TILE_GRASS = 2 # Use your actual grass tile ID
 # Cave entrance tile ID (choose a unique unused tile ID)
@@ -119,64 +124,22 @@ var _crafting_book_cache = {
 }
 var _inventory_version = 0
 
-#---- START GAME -----
-func _ready():
-	# Instance the player scene
-	print("hello world")
-	var player_scene = preload("res://scenes/player.tscn")
-	player = player_scene.instantiate()
-	add_child(player)
+# --- CAVE ENTRANCE SPAWN LOGIC ---
+var placed_cave_count := 0
+var max_caves := 5
+var placed_cave_positions := []
 
-	# Get the TileMap node
-	var tilemap = $NavigationRegion2D/TileMap
 
-	# Place player 
-	var spawn_tile = find_valid_spawn_tile(tilemap)
-	player.position = tilemap.map_to_local(spawn_tile)
-	load_game()
-	# Generate initial chunks around the player
-	tilemap.update_visible_chunks(player.position)
-	spawn_pigs_on_grass(20)
-	spawn_goats_on_mountains(10)
-	var fog_tilemap = $NavigationRegion2D/FogTileMap
-	# Add AudioStreamPlayer for UI sound
-	ui_player = AudioStreamPlayer.new()
-	ui_player.stream = ui_sound
-	ui_player.volume_db = -20 # Higher volume for UI click sound
-	ui_player.bus = "Master"
-	add_child(ui_player)
-	# Connect UI button signals to play sound
-	if $UI.has_node("HarvestButton"):
-		$UI/HarvestButton.pressed.connect(play_ui_sound)
-	if $UI.has_node("InventoryButton"):
-		$UI/InventoryButton.pressed.connect(play_ui_sound)
-	if $UI.has_node("CraftingBookButton"):
-		$UI/CraftingBookButton.pressed.connect(play_ui_sound)
-	# Add QuickBar UI if not present
-	quick_bar_container = $UI/QuickBar
-	quick_bar_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	quick_bar_container.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	update_quick_bar()
+func load_inventory_key():
+	var config = ConfigFile.new()
+	var err = config.load(config_path)
+	if err == OK:
+		var inventory_key = config.get_value("controls", "inventory", "i")
+		InputMap.action_erase_events("inventory")
+		var ev = InputEventKey.new()
+		ev.keycode = OS.find_keycode_from_string(inventory_key)
+		InputMap.action_add_event("inventory", ev)
 
-	# --- Add 4 recipe icons to the first column of RecipeGrid ---
-	var recipe_icons = ["campfire", "wall", "big_stick", "crafting_table"]
-	var recipe_grid = $UI/CraftingBookWindow/RecipeGrid
-	# Add colored backgrounds for each column (3 columns)
-	var column_colors = [Color(1,0.9,0.9,0.5), Color(0.9,1,0.9,0.5), Color(0.9,0.9,1,0.5)]
-	var grid_columns = 3
-	var grid_rows = 4 # at least as many as recipe_icons
-	# Fill the grid with ColorRects for each cell
-	for row in range(grid_rows):
-		for col in range(grid_columns):
-			var color_rect = ColorRect.new()
-			color_rect.color = column_colors[col]
-			color_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			color_rect.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			color_rect.custom_minimum_size = Vector2(80, 80)
-			recipe_grid.add_child(color_rect)
-	# Build the requirements UI for the first time
-	update_recipe_requirements()
-# --- Helper to update the requirements UI in the crafting book ---
 func update_recipe_requirements():
 	var recipe_icons = ["campfire", "wall", "big_stick", "crafting_table"]
 	var recipe_grid = $UI/CraftingBookWindow/RecipeGrid
@@ -278,11 +241,69 @@ func update_recipe_requirements():
 		recipe_grid.move_child(req_container, req_cell_index)
 
 	# Call this function whenever inventory changes
+#---- START GAME -----
+func _ready():
+	load_inventory_key()
+# ...existing code...
+	
+	# Instance the player scene
+	print("hello world")
+	var player_scene = preload("res://scenes/player.tscn")
+	player = player_scene.instantiate()
+	add_child(player)
 
-# --- CAVE ENTRANCE SPAWN LOGIC ---
-var placed_cave_count := 0
-var max_caves := 5
-var placed_cave_positions := []
+	# Get the TileMap node
+	var tilemap = $NavigationRegion2D/TileMap
+
+	# Place player 
+	var spawn_tile = find_valid_spawn_tile(tilemap)
+	player.position = tilemap.map_to_local(spawn_tile)
+	load_game()
+	# Generate initial chunks around the player
+	tilemap.update_visible_chunks(player.position)
+	spawn_pigs_on_grass(20)
+	spawn_goats_on_mountains(10)
+	spawn_bunnies(10)
+	var fog_tilemap = $NavigationRegion2D/FogTileMap
+	# Add AudioStreamPlayer for UI sound
+	ui_player = AudioStreamPlayer.new()
+	ui_player.stream = ui_sound
+	ui_player.volume_db = -20 # Higher volume for UI click sound
+	ui_player.bus = "Master"
+	add_child(ui_player)
+	# Connect UI button signals to play sound
+	if $UI.has_node("HarvestButton"):
+		$UI/HarvestButton.pressed.connect(play_ui_sound)
+	if $UI.has_node("InventoryButton"):
+		$UI/InventoryButton.pressed.connect(play_ui_sound)
+	if $UI.has_node("CraftingBookButton"):
+		$UI/CraftingBookButton.pressed.connect(play_ui_sound)
+	# Add QuickBar UI if not present
+	quick_bar_container = $UI/QuickBar
+	quick_bar_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quick_bar_container.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	update_quick_bar()
+
+	# --- Add 4 recipe icons to the first column of RecipeGrid ---
+	var recipe_icons = ["campfire", "wall", "big_stick", "crafting_table"]
+	var recipe_grid = $UI/CraftingBookWindow/RecipeGrid
+	# Add colored backgrounds for each column (3 columns)
+	var column_colors = [Color(1,0.9,0.9,0.5), Color(0.9,1,0.9,0.5), Color(0.9,0.9,1,0.5)]
+	var grid_columns = 3
+	var grid_rows = 4 # at least as many as recipe_icons
+	# Fill the grid with ColorRects for each cell
+	for row in range(grid_rows):
+		for col in range(grid_columns):
+			var color_rect = ColorRect.new()
+			color_rect.color = column_colors[col]
+			color_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			color_rect.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			color_rect.custom_minimum_size = Vector2(80, 80)
+			recipe_grid.add_child(color_rect)
+	# Build the requirements UI for the first time
+	update_recipe_requirements()
+# --- Helper to update the requirements UI in the crafting book ---
+
 
 # Call this from chunk generation logic, passing the chunk_coords and tilemap
 func try_place_cave_in_chunk(tilemap, chunk_coords):
@@ -778,6 +799,14 @@ func place_object_on_tile(item_name, tile):
 		placed_campfires.append(tile) # <-- Track campfire tile
 		inventory[item_name] -= 1
 		update_inventory_ui()
+	elif item_name == "trap":
+		var trap_scene = preload("res://scenes/placeable/trap.tscn")
+		var trap = trap_scene.instantiate()
+		trap.position = tilemap.map_to_local(tile)
+		trap.add_to_group("traps")
+		add_child(trap)
+		inventory[item_name] -= 1
+		update_inventory_ui()
 	elif item_name == "wall":
 		var wall = wall_scene.instantiate()
 		wall.position = tilemap.map_to_local(tile)
@@ -796,15 +825,7 @@ func place_object_on_tile(item_name, tile):
 		inventory[item_name] -= 1
 		update_inventory_ui()
 		update_quick_bar()
-	elif item_name == "trap":
-		var trap = trap_scene.instantiate()
-		trap.position = tilemap.map_to_local(tile)
-		trap.name = "Trap_%s_%s" % [tile.x, tile.y]
-		trap.add_to_group("Traps")
-		tilemap.add_child(trap)
-		inventory[item_name] -= 1
-		update_inventory_ui()
-		update_quick_bar()
+
 	_inventory_version += 1 # Increment inventory version after placing an object
 
 
@@ -1146,7 +1167,7 @@ func _input(event):
 		var num_rows = int(ceil(float(num_items) / slots_per_row))
 		var row = int(selected_inventory_index / slots_per_row)
 		var col = int(selected_inventory_index % slots_per_row)
-		var recipe_icons = ["campfire","wall","big_stick","crafting_table","rope","shovel","axe","hat"]
+		var recipe_icons = ["campfire","wall","big_stick","crafting_table","rope","shovel","axe","trap"]
 		var max_index = recipe_icons.size() -1
 		if ui_focus == "inventory":
 			print("focus inventory")
@@ -1209,7 +1230,7 @@ func _input(event):
 				# Space bar or accept: select item for placement if placeable and focused in inventory (do NOT place yet)
 				if selected_inventory_index < items.size():
 					var selected_item_name = items[selected_inventory_index]
-					if selected_item_name == "campfire" or selected_item_name == "wall" or selected_item_name == "crafting_table":
+					if selected_item_name == "campfire" or selected_item_name == "wall" or selected_item_name == "crafting_table" or selected_item_name == "trap":
 						is_placing = true
 						placing_item = selected_item_name
 						$UI/InventoryWindow.visible = false
@@ -1375,7 +1396,7 @@ func _input(event):
 					deconstruct_candidates.append({"node": campfire, "type": "campfire", "tile": check_tile, "pos": campfire.position})
 			for table in get_tree().get_nodes_in_group("tables"):
 				if table.position.distance_to(check_pos) < 2.0:
-					deconstruct_candidates.append({"node": table, "type": "table", "tile": check_pos, "pos": table.position})
+					deconstruct_candidates.append({"node": table, "type": "table", "tile": check_tile, "pos": table.position})
 		if deconstruct_candidates.size() == 0:
 			if deconstruct_highlight:
 				deconstruct_highlight.queue_free()
@@ -1405,7 +1426,7 @@ func _input(event):
 
 func update_crafting_table_highlight():
 	var recipe_grid = $UI/CraftingTableWindow/RecipeGrid
-	var recipe_icons = ["campfire","wall","big_stick","crafting_table","rope","shovel","axe","hat"]
+	var recipe_icons = ["campfire","wall","big_stick","crafting_table","rope","shovel","axe","trap"]
 	for i in range(recipe_icons.size()):
 		var icon_bg = recipe_grid.get_child(i * 2)
 		if icon_bg is ColorRect:
@@ -1648,7 +1669,7 @@ func swap_inventory_slots(from_index: int, to_index: int) -> void:
 
 
 func update_crafting_table_recipes():
-	var recipe_icons = ["campfire", "wall", "big_stick","crafting_table", "rope", "shovel", "axe", "hat"]
+	var recipe_icons = ["campfire", "wall", "big_stick","crafting_table", "rope", "shovel", "axe", "trap"]
 	var recipe_grid = $UI/CraftingTableWindow/RecipeGrid
 	# Clear previous icons
 	for child in recipe_grid.get_children():
@@ -1692,7 +1713,7 @@ func update_crafting_table_recipes():
 			missing.text = icon_name
 			missing.modulate = Color(1,0,0)
 			bg.add_child(missing)
-		#put requirement here  -> icon img + labeltext
+		# put requirement here  -> icon img + labeltext
 		
 		#bg part 
 		var req_bg = ColorRect.new()
@@ -1816,4 +1837,54 @@ func prompt_delete_item(item_name: String, max_amount: int, callback: Callable, 
 		if event is InputEventKey and event.pressed:
 			if event.keycode == KEY_SPACE or event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 				do_delete.call()
+				event.accept()
 	)
+
+
+func spawn_bunnies(count: int):
+	var tilemap = $NavigationRegion2D/TileMap
+	var spawned = 0
+	var tries = 0
+	var chunk_size = tilemap.chunk_size
+	var loaded_chunks = tilemap.active_chunks.keys()
+	var player_tile = tilemap.local_to_map(player.position)
+	var min_bunny_distance = 10 # Minimum distance from player and other bunnies
+
+	while spawned < count and tries < count * 50:
+		# Pick a random loaded chunk for the group
+		var chunk_coords = loaded_chunks[randi() % loaded_chunks.size()]
+		var start_x = chunk_coords.x * chunk_size
+		var start_y = chunk_coords.y * chunk_size
+		var group_spawned = 0
+		var group_positions = []
+		# Try to spawn a group of 3 bunnies close together
+		for i in range(3):
+			var x = start_x + randi() % chunk_size
+			var y = start_y + randi() % chunk_size
+			var tile_pos = Vector2i(x, y)
+			# Prevent spawn near world edge
+			if x > WORLD_MAX - 50 or x < WORLD_MIN + 50 or y > WORLD_MAX - 50 or y < WORLD_MIN + 50:
+				continue
+			var tile_type = tilemap.get_cell_source_id(0, tile_pos)
+			if tile_type not in [TILE_GRASS, TILE_FOREST, TILE_HILL]:
+				continue
+			# Enforce minimum distance to player and other bunnies
+			var too_close = false
+			for bunny in bunnies:
+				var bunny_tile = tilemap.local_to_map(bunny.position)
+				if bunny_tile.distance_to(tile_pos) < min_bunny_distance:
+					too_close = true
+					break
+			if player_tile.distance_to(tile_pos) < min_bunny_distance:
+				too_close = true
+			if not too_close:
+				group_positions.append(tile_pos)
+		# Only spawn group if at least 2 bunnies can be placed
+		if group_positions.size() >= 2:
+			for tile_pos in group_positions:
+				var bunny = bunny_scene.instantiate()
+				bunny.position = tilemap.map_to_local(tile_pos)
+				add_child(bunny)
+				bunnies.append(bunny)
+				spawned += 1
+		tries += 1

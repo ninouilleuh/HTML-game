@@ -490,7 +490,6 @@ func generate_chunk(chunk_coords: Vector2i):
 			main.add_child(wall)
 		main.unloaded_walls.erase(chunk_coords)
 	# --- RESTORE GOATS ---
-	
 	if main.unloaded_goats and main.unloaded_goats.has(chunk_coords):
 		for goat_data in main.unloaded_goats[chunk_coords]:
 			var goat = main.goat_scene.instantiate()
@@ -501,6 +500,15 @@ func generate_chunk(chunk_coords: Vector2i):
 			main.add_child(goat)
 			main.goats.append(goat)
 		main.unloaded_goats.erase(chunk_coords)
+
+	# --- RESTORE BUNNIES ---
+	if main.unloaded_bunnies and main.unloaded_bunnies.has(chunk_coords):
+		for bunny_pos in main.unloaded_bunnies[chunk_coords]:
+			var bunny = main.bunny_scene.instantiate()
+			bunny.position = bunny_pos
+			main.add_child(bunny)
+			main.bunnies.append(bunny)
+		main.unloaded_bunnies.erase(chunk_coords)
 
 # Helper function to flow river downhill
 func _generate_river_from(start_pos: Vector2i, elevation_map, tile_map, bias_south := false):
@@ -551,6 +559,19 @@ func unload_chunk(chunk_coords: Vector2i):
 			pig.get_parent().remove_child(pig)
 			pig.queue_free()
 			main.pigs.erase(pig)
+
+	# Remove bunnies in this chunk
+	for bunny in main.bunnies.duplicate():
+		var bunny_tile = local_to_map(bunny.position)
+		var bunny_chunk = Vector2i(floor(bunny_tile.x / chunk_size), floor(bunny_tile.y / chunk_size))
+		if bunny_chunk == chunk_coords:
+			if not main.unloaded_bunnies.has(chunk_coords):
+				main.unloaded_bunnies[chunk_coords] = []
+			main.unloaded_bunnies[chunk_coords].append(bunny.position)
+			if bunny.get_parent():
+				bunny.get_parent().remove_child(bunny)
+			bunny.queue_free()
+			main.bunnies.erase(bunny)
 	# Remove campfires in this chunk
 	for campfire in main.get_tree().get_nodes_in_group("campfires").duplicate():
 		var campfire_tile = local_to_map(campfire.position)
@@ -602,11 +623,13 @@ func unload_chunk(chunk_coords: Vector2i):
 
 	# After removing pigs, check if we need to spawn more
 	if main and main.has_method("spawn_pigs_on_grass"):
-		if main.pigs.size() < 10: # or whatever your minimum is
+		if main.pigs.size() < 10:
 			main.spawn_pigs_on_grass(10)
 	if main and main.has_method("spawn_goats_on_mountains"):
 		if main.goats.size() < 5:
 			main.spawn_goats_on_mountains(5)
+	# After removing bunnies, check if we need to spawn more
+	# (Do not spawn here, only after chunk loading to avoid double-counting unloaded bunnies)
 
 # Loads/generates all chunks within render_distance of the given position, and unloads those outside
 func update_visible_chunks(player_pos: Vector2):
@@ -637,6 +660,11 @@ func update_visible_chunks(player_pos: Vector2):
 						y < WORLD_MIN + 50 or y > WORLD_MAX - 50
 					):
 						fog_tilemap.set_cell(0, Vector2i(x, y), FOG_EDGE_TILE_ID, Vector2i(0, 0), 0)
+	# After loading/generating all needed chunks, check if we need to spawn more bunnies
+	var main = get_tree().get_root().get_node("Main")
+	if main and main.has_method("spawn_bunnies"):
+		if main.bunnies.size() < 1:
+			main.spawn_bunnies(6)
 	# Unload chunks that are no longer needed
 	for chunk_coords in active_chunks.keys():
 		if not new_active_chunks.has(chunk_coords):

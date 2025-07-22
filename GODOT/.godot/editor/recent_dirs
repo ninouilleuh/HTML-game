@@ -1,9 +1,11 @@
-res://script
-res://assets/items
+res://scenes/ennemies
+res://scenes
 C:/Users/palom/Documents/GitHub/HTML-game/windows
-C:/Users/palom/Documents/GitHub/HTML-game
 res://
 res://assets
-res://scenes
+res://player/png
+res://script
+res://assets/items
+C:/Users/palom/Documents/GitHub/HTML-game
 C:/Users/palom/Documents/GitHub/HTML-game/GODOT
 res://tiles

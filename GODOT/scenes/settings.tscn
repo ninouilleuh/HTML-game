@@ -1,0 +1,216 @@
+[gd_scene load_steps=3 format=3 uid="uid://ddqlbuslnqf6i"]
+
+[ext_resource type="Script" uid="uid://klwu67hxdyxk" path="res://script/settings.gd" id="1_5p8wc"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_36l1p"]
+bg_color = Color(0, 0, 0, 1)
+
+[node name="Settings" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_5p8wc")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_36l1p")
+
+[node name="SettingsTitleLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -31.0
+offset_right = 31.0
+offset_bottom = 23.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 50
+text = "Settings"
+
+[node name="Inventory" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -39.5
+offset_top = -11.5
+offset_right = 39.5
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "Inventory "
+
+[node name="InventoryLineEdit" type="LineEdit" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.57
+anchor_top = 0.5
+anchor_right = 0.57
+anchor_bottom = 0.5
+offset_left = -34.2813
+offset_top = -15.5
+offset_right = 34.2813
+offset_bottom = 15.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainMenuButton" type="Button" parent="."]
+layout_mode = 0
+offset_right = 8.0
+offset_bottom = 8.0
+text = "<- main menu"
+
+[node name="move_up" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.566
+anchor_right = 0.5
+anchor_bottom = 0.566
+offset_left = -33.5
+offset_top = -11.5
+offset_right = 33.5
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "Move Up"
+
+[node name="move_down" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.631
+anchor_right = 0.5
+anchor_bottom = 0.631
+offset_left = -46.0
+offset_top = -11.5
+offset_right = 46.0
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "Move Down"
+
+[node name="move_right" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.697
+anchor_right = 0.5
+anchor_bottom = 0.697
+offset_left = -43.5
+offset_top = -11.5
+offset_right = 43.5
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "Move Right"
+
+[node name="move_left" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.763
+anchor_right = 0.5
+anchor_bottom = 0.763
+offset_left = -38.5
+offset_top = -11.5
+offset_right = 38.5
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "Move Left"
+
+[node name="action" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.434
+anchor_right = 0.5
+anchor_bottom = 0.435
+offset_left = -25.0
+offset_top = -11.5
+offset_right = 25.0
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "Action"
+
+[node name="ActionLineEdit" type="LineEdit" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.57
+anchor_top = 0.44
+anchor_right = 0.57
+anchor_bottom = 0.44
+offset_left = -34.2813
+offset_top = -15.5
+offset_right = 34.2813
+offset_bottom = 15.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MoveUpLineEdit" type="LineEdit" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.57
+anchor_top = 0.57
+anchor_right = 0.57
+anchor_bottom = 0.57
+offset_left = -34.2813
+offset_top = -15.5
+offset_right = 34.2813
+offset_bottom = 15.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MoveDownLineEdit" type="LineEdit" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.57
+anchor_top = 0.63
+anchor_right = 0.57
+anchor_bottom = 0.63
+offset_left = -34.2813
+offset_top = -15.5
+offset_right = 34.2813
+offset_bottom = 15.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MoveRightLineEdit" type="LineEdit" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.57
+anchor_top = 0.7
+anchor_right = 0.57
+anchor_bottom = 0.7
+offset_left = -34.2813
+offset_top = -15.5
+offset_right = 34.2813
+offset_bottom = 15.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MoveLeftLineEdit" type="LineEdit" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.57
+anchor_top = 0.76
+anchor_right = 0.57
+anchor_bottom = 0.76
+offset_left = -34.2813
+offset_top = -15.5
+offset_right = 34.2813
+offset_bottom = 15.5
+grow_horizontal = 2
+grow_vertical = 2

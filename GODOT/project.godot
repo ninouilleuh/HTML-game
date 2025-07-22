@@ -11,8 +11,13 @@ config_version=5
 [application]
 
 config/name="Where are we?"
-run/main_scene="uid://disfrftfmxylm"
+config/description="Where are we by ninouilleuh. All right reserved."
+config/version="0.0.1"
+run/main_scene="uid://cmtq2eqqj4hf8"
 config/features=PackedStringArray("4.4", "GL Compatibility")
+boot_splash/bg_color=Color(0, 0, 0, 1)
+boot_splash/image="uid://bufabaoevkoej"
+config/icon="uid://duoi4swoof2qv"
 
 [display]
 

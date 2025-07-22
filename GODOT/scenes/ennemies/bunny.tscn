@@ -1,0 +1,16 @@
+[gd_scene load_steps=4 format=3 uid="uid://dd52nmso4e0q0"]
+
+[ext_resource type="Script" uid="uid://b5cuygbgmaf0m" path="res://script/bunny.gd" id="1_e7rce"]
+[ext_resource type="Texture2D" uid="uid://dq63h42jctbo3" path="res://assets/enemies/bunny.png" id="1_ntwl3"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_e7rce"]
+size = Vector2(22, 22)
+
+[node name="bunny" type="CharacterBody2D"]
+script = ExtResource("1_e7rce")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1_ntwl3")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_e7rce")
