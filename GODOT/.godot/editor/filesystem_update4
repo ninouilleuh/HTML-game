@@ -9,3 +9,11 @@ res://scenes/player.tscn
 res://script/bunny.gd
 res://scenes/settings.tscn
 res://script/settings.gd
+res://script/caves.gd
+res://script/game_over_screen.gd
+res://script/goat.gd
+res://script/InventorySlotDrag.gd
+res://script/mainmenu.gd
+res://script/pig.gd
+res://script/player.gd
+res://script/tutorial_screen.gd
