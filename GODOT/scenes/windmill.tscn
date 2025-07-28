@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://cfbs2khw31v0d"]
+
+[node name="windmill" type="Node2D"]
+
+[node name="exterior" type="Sprite2D" parent="."]
+
+[node name="interior" type="Sprite2D" parent="."]
+visible = false
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]

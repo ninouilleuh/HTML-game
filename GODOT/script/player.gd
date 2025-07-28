@@ -2,7 +2,7 @@ extends Node2D
 
 const TILE_MOUNTAIN = 5 
 const TILE_WALL = 11
-var base_speed := 900
+var base_speed := 800
 var mountain_speed := 200
 @export var move_speed = base_speed  # Pixels per second
 

@@ -93,7 +93,7 @@ func generate_chunk(chunk_coords: Vector2i):
 		var tile = TILE_GRASS
 
 		# --- 1. Blended transition band  ---
-		if (y > 500 and y <= 750): #250 
+		if (y > 250 and y <= 400): #250 
 			var p = e
 			var blend = float(y - 500) / 250.0 # 0 at y=500, 1 at y=750
 			var blend_mask = feature_noise.get_noise_2d(float(x) * 1, float(y) * 1 + 12345) * 0.5 + 0.5
@@ -158,7 +158,7 @@ func generate_chunk(chunk_coords: Vector2i):
 				subtropical_tile = TILE_MOUNTAIN
 			tile = subtropical_tile if blend_mask < blend else tropical_tile
 		# --- 2. Blended transition band ---
-		elif (y >= -750 and y < -500): #250
+		elif (y >= -400 and y < -250): #250
 			var p = e
 			var blend = float(y + 750) / 250.0 # 0 at y=-750, 1 at y=-500
 			var blend_mask = feature_noise.get_noise_2d(float(x) * 1, float(y) * 1 + 12345) * 0.5 + 0.5
@@ -222,7 +222,7 @@ func generate_chunk(chunk_coords: Vector2i):
 				subtropical_tile = TILE_MOUNTAIN
 			tile = tropical_tile if blend_mask < blend else subtropical_tile
 		# --- 3. Main tropical biome --- #500 tiny
-		elif y >= -500 and y <= 500:
+		elif y >= -250 and y <= 250:
 			var p = e
 			if p <= 0.30:
 				tile = TILE_FOREST
@@ -250,7 +250,7 @@ func generate_chunk(chunk_coords: Vector2i):
 				tile = TILE_MOUNTAIN
 
 		# --- 4. Main subtropical biome --- #1000 big 
-		elif (y > 750 and y <= 1750) or (y < -750 and y >= -1750): #subtropical biome
+		elif (y > 400 and y <= 1750) or (y < -400 and y >= -1750): #subtropical biome
 			# Maze-like, but more like the transition band: sand, mountain, some salt, but more mountains than transition
 			var blend_mask = feature_noise.get_noise_2d(float(x) * 1.0, float(y) * 1.0 + 54321) * 0.5 + 0.5
 			var blend = 0.45 # Lower than transition band for more mountains

@@ -404,6 +404,12 @@ func _process(delta):
 		time_of_day -= HOURS_PER_DAY
 		day += 1
 		print("Day ", day, " begins!")
+		if inventory.has("salt") and inventory["salt"] > 0:
+			inventory["salt"] -= 1
+			if inventory["salt"] < 0:
+				inventory["salt"] = 0
+			if has_method("update_inventory_ui"):
+				update_inventory_ui()
 
 	# Update time label
 	var hour = int(time_of_day)
@@ -913,10 +919,10 @@ func find_valid_spawn_tile(tilemap):
 		var y = 0
 		# Pick a y in the grass biome bands
 		if randi() % 2 == 0:
-			y = randi_range(500, 500)
+			y = randi_range(0, 250)
 		else:
-			y = randi_range(-500, -500)
-		var x = randi_range(WORLD_MIN, WORLD_MAX)
+			y = randi_range(-250, 0)
+		var x = randi_range(WORLD_MIN+100, WORLD_MAX-100)
 		var chunk_size = tilemap.chunk_size
 		var chunk_coords = Vector2i(floor(x / chunk_size), floor(y / chunk_size))
 		if not tilemap.active_chunks.has(chunk_coords):
